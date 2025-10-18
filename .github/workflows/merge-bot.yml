@@ -1,0 +1,326 @@
+name: Merge Bot
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  merge-and-update:
+    if: github.event.issue.pull_request != null && contains(github.event.comment.body, '/merge')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create loading comment
+        id: loading_comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMENT_ID=$(gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
+            -f body='<img src="https://xrgkyc5aexvkc7oh.public.blob.vercel-storage.com/loading-spinner-TPIqYiHmChtY21ZfF6puFEZq9X5MDx" width="20" align="top">  Merging...
+
+          _I&apos;m going as fast as I can!_
+
+          [View workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})' \
+            --jq '.id')
+          echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
+
+      - name: Set commenter info
+        run: |
+          echo "COMMENTER=${{ github.event.comment.user.login }}" >> $GITHUB_ENV
+          echo "PR_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
+
+      - name: Check permissions
+        id: permission_check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PERMISSION=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/collaborators/${{ env.COMMENTER }}/permission" \
+            --jq '.permission')
+
+          if [[ "$PERMISSION" == "admin" || "$PERMISSION" == "write" ]]; then
+            echo "allowed=true" >> $GITHUB_OUTPUT
+          else
+            echo "allowed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment permission denied
+        if: failure() || steps.permission_check.outputs.allowed == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/issues/comments/${{ steps.loading_comment.outputs.comment_id }}" \
+            -f body='🔒 Sorry @${{ env.COMMENTER }}, only repository maintainers can use the `/merge` command.
+
+          [View workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})'
+
+      - name: Checkout repo
+        if: steps.permission_check.outputs.allowed == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get PR details
+        if: steps.permission_check.outputs.allowed == 'true'
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_DATA=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/pulls/${{ github.event.issue.number }}")
+
+          echo "branch=$(echo "$PR_DATA" | jq -r '.head.ref')" >> $GITHUB_OUTPUT
+          echo "base_branch=$(echo "$PR_DATA" | jq -r '.base.ref')" >> $GITHUB_OUTPUT
+          echo "title=$(echo "$PR_DATA" | jq -r '.title')" >> $GITHUB_OUTPUT
+          echo "author=$(echo "$PR_DATA" | jq -r '.user.login')" >> $GITHUB_OUTPUT
+          echo "mergeable=$(echo "$PR_DATA" | jq -r '.mergeable')" >> $GITHUB_OUTPUT
+          echo "state=$(echo "$PR_DATA" | jq -r '.state')" >> $GITHUB_OUTPUT
+          echo "labels=$(echo "$PR_DATA" | jq -c '[.labels[].name]')" >> $GITHUB_OUTPUT
+
+      - name: Fetch all branches
+        if: steps.permission_check.outputs.allowed == 'true'
+        run: git fetch origin +refs/heads/*:refs/remotes/origin/*
+
+      - name: Check if PR is up to date
+        if: steps.permission_check.outputs.allowed == 'true'
+        id: up_to_date
+        run: |
+          git checkout ${{ steps.pr.outputs.branch }}
+          git fetch origin ${{ steps.pr.outputs.base_branch }}
+          if git merge-base --is-ancestor origin/${{ steps.pr.outputs.base_branch }} ${{ steps.pr.outputs.branch }}; then
+            echo "result=up_to_date" >> $GITHUB_OUTPUT
+          else
+            echo "result=outdated" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment if outdated
+        if: steps.permission_check.outputs.allowed == 'true' && steps.up_to_date.outputs.result == 'outdated'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/issues/comments/${{ steps.loading_comment.outputs.comment_id }}" \
+            -f body='⚠️ Cannot fast-forward merge because `${{ steps.pr.outputs.branch }}` is not up to date with `${{ steps.pr.outputs.base_branch }}`. Please rebase your feature branch to `${{ steps.pr.outputs.base_branch }}`.
+
+          [View workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})'
+
+      - name: Fast-forward merge into base
+        if: steps.permission_check.outputs.allowed == 'true' && steps.up_to_date.outputs.result == 'up_to_date'
+        id: merge
+        run: |
+          git checkout ${{ steps.pr.outputs.base_branch }}
+          PREV_SHA=$(git rev-parse HEAD)
+          echo "prev_sha=$PREV_SHA" >> $GITHUB_OUTPUT
+
+          if git merge --ff-only origin/${{ steps.pr.outputs.branch }}; then
+            NEW_SHA=$(git rev-parse HEAD)
+            echo "new_sha=$NEW_SHA" >> $GITHUB_OUTPUT
+            
+            if git push origin ${{ steps.pr.outputs.base_branch }}; then
+              echo "success=true" >> $GITHUB_OUTPUT
+            else
+              echo "success=false" >> $GITHUB_OUTPUT
+              echo "error_type=push_failed" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "error_type=merge_failed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment merge failure
+        if: failure() || steps.permission_check.outputs.allowed == 'true' && steps.up_to_date.outputs.result == 'up_to_date' && steps.merge.outputs.success == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/issues/comments/${{ steps.loading_comment.outputs.comment_id }}" \
+            -f body='❌ Merge failed.
+
+          ${{ steps.merge.outputs.error_type == 'push_failed' && '**Push rejected**: This is likely due to repository rules (e.g., no merge commits allowed). The merge was successful locally but could not be pushed.' || '**Merge conflict**: Unable to fast-forward merge. This usually means the branch cannot be cleanly merged.' }}
+
+          [View workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          _@${{ env.COMMENTER }}_'
+
+      - name: Check if changelog should be skipped
+        if: steps.permission_check.outputs.allowed == 'true' && steps.merge.outputs.success == 'true'
+        id: check_changelog
+        run: |
+          LABELS='${{ steps.pr.outputs.labels }}'
+          BASE_BRANCH='${{ steps.pr.outputs.base_branch }}'
+          SKIP="false"
+          if echo "$LABELS" | jq -e 'index("skip-changelog")' > /dev/null; then
+            SKIP="true"
+          fi
+          if [ "$BASE_BRANCH" != "main" ]; then
+            SKIP="true"
+          fi
+          echo "skip=$SKIP" >> $GITHUB_OUTPUT
+
+      - name: Set additional environment variables for changelog
+        if: steps.permission_check.outputs.allowed == 'true' && steps.merge.outputs.success == 'true' && steps.check_changelog.outputs.skip == 'false'
+        run: |
+          echo "PR_TITLE=${{ steps.pr.outputs.title }}" >> $GITHUB_ENV
+          echo "PR_AUTHOR=${{ steps.pr.outputs.author }}" >> $GITHUB_ENV
+          echo "PR_BRANCH=${{ steps.pr.outputs.branch }}" >> $GITHUB_ENV
+          echo "BASE_BRANCH=${{ steps.pr.outputs.base_branch }}" >> $GITHUB_ENV
+          echo "PREV_SHA=${{ steps.merge.outputs.prev_sha }}" >> $GITHUB_ENV
+          echo "NEW_SHA=${{ steps.merge.outputs.new_sha }}" >> $GITHUB_ENV
+
+      - name: Update CHANGELOG.md
+        if: steps.permission_check.outputs.allowed == 'true' && steps.merge.outputs.success == 'true' && steps.check_changelog.outputs.skip == 'false'
+        id: changelog
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          declare -A TYPE_MAP=(
+            ["build"]="Build"
+            ["ci"]="CI"
+            ["docs"]="Documentation"
+            ["feat"]="Feature"
+            ["fix"]="Fix"
+            ["perf"]="Performance"
+            ["refactor"]="Refactor"
+            ["style"]="Style"
+            ["test"]="Test"
+          )
+
+          # Parse type, scope, and description from PR_TITLE
+          TYPE=$(echo "$PR_TITLE" | sed -E 's/^([a-z]+)(\([^\)]*\))?:.*/\1/')
+          SCOPE=$(echo "$PR_TITLE" | sed -nE 's/^[a-z]+\(([^)]*)\):.*/\1/p')
+          DESCRIPTION=$(echo "$PR_TITLE" | sed -E 's/^[a-z]+(\([^\)]*\))?:\s*(.*)/\2/')
+          TYPE_HUMAN="${TYPE_MAP[$TYPE]}"
+
+          if [[ -n "$TYPE_HUMAN" ]]; then
+            if [[ -n "$SCOPE" ]]; then
+              PREFIX="**${TYPE_HUMAN}**(${SCOPE})"
+            else
+              PREFIX="**${TYPE_HUMAN}**"
+            fi
+          else
+            PREFIX="**Other**"
+          fi
+
+          SHORT_PREV=$(echo $PREV_SHA | cut -c1-7)
+          SHORT_NEW=$(echo $NEW_SHA | cut -c1-7)
+          COMPARE_URL="https://github.com/${{ github.repository }}/compare/$SHORT_PREV...$SHORT_NEW"
+
+          ENTRY="- ${PREFIX}: ${DESCRIPTION} ([#${PR_NUMBER}](https://github.com/${{ github.repository }}/pull/${PR_NUMBER})) by [@${PR_AUTHOR}](https://github.com/${PR_AUTHOR}) - [\`${SHORT_PREV}...${SHORT_NEW}\`]($COMPARE_URL)"
+
+          # Read current CHANGELOG.md
+          CHANGELOG_CONTENT=$(cat CHANGELOG.md)
+
+          # If no "Unreleased Features" section, prepend it with details block
+          if ! grep -q '^## Unreleased Features' CHANGELOG.md; then
+            NEW_CHANGELOG="## Unreleased Features
+
+          <details>
+          <summary>All commits</summary>
+
+          $ENTRY
+
+          </details>
+
+          $CHANGELOG_CONTENT"
+          else
+            # Insert the new entry as the first item after the blank line following summary
+            NEW_CHANGELOG=$(awk -v entry="$ENTRY" 'BEGIN{done=0; after_summary=0}
+            {
+              if(!done && /<summary>All commits<\/summary>/){
+                print
+                after_summary=1
+                next
+              }
+              if(after_summary && !done && /^$/) {
+                print
+                print entry
+                done=1
+                next
+              }
+              print
+            }' CHANGELOG.md)
+          fi
+
+          # Get current file SHA
+          FILE_SHA=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/contents/CHANGELOG.md?ref=$BASE_BRANCH" \
+            --jq '.sha')
+
+          # Create commit via API (will be verified)
+          ENCODED_CONTENT=$(echo "$NEW_CHANGELOG" | base64 -w 0)
+
+          if gh api \
+            --method PUT \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/contents/CHANGELOG.md" \
+            -f message="chore(docs): update changelog for #${PR_NUMBER}" \
+            -f content="$ENCODED_CONTENT" \
+            -f sha="$FILE_SHA" \
+            -f branch="$BASE_BRANCH" > /dev/null 2>&1; then
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "error=api_commit_failed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment changelog failure
+        if: failure() || steps.permission_check.outputs.allowed == 'true' && steps.merge.outputs.success == 'true' && steps.check_changelog.outputs.skip == 'false' && steps.changelog.outputs.success == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/issues/comments/${{ steps.loading_comment.outputs.comment_id }}" \
+            -f body='⚠️ Merge succeeded but changelog update failed.
+
+          **Error**: ${{ steps.changelog.outputs.error == 'push_failed' && 'Failed to push changelog commit' || 'Failed to create changelog commit' }}
+
+          The PR has been merged successfully but the changelog was not updated automatically.
+
+          [View workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          _@${{ env.COMMENTER }}_'
+
+      - name: Comment success with changelog
+        if: steps.permission_check.outputs.allowed == 'true' && steps.merge.outputs.success == 'true' && steps.check_changelog.outputs.skip == 'false' && steps.changelog.outputs.success == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/issues/comments/${{ steps.loading_comment.outputs.comment_id }}" \
+            -f body='🎉 Successfully fast-forward merged `${{ env.PR_BRANCH }}` into `${{ env.BASE_BRANCH }}`.
+          - Compare: https://github.com/${{ github.repository }}/compare/${{ env.PREV_SHA }}...${{ env.NEW_SHA }}
+
+          [View workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})'
+
+      - name: Comment success without changelog
+        if: steps.permission_check.outputs.allowed == 'true' && steps.merge.outputs.success == 'true' && steps.check_changelog.outputs.skip == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/issues/comments/${{ steps.loading_comment.outputs.comment_id }}" \
+            -f body='🎉 Successfully fast-forward merged `${{ steps.pr.outputs.branch }}` into `${{ steps.pr.outputs.base_branch }}`.
+          - Compare: https://github.com/${{ github.repository }}/compare/${{ steps.merge.outputs.prev_sha }}...${{ steps.merge.outputs.new_sha }}
+
+          ℹ️ Changelog update skipped.
+
+          [View workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})'
