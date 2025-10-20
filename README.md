@@ -1,29 +1,46 @@
-# Create T3 App
+# Welcome to your Convex + Next.js + Convex Auth app
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+This is a [Convex](https://convex.dev/) project created with [`npm create convex`](https://www.npmjs.com/package/create-convex).
 
-## What's next? How do I make an app with this?
+After the initial setup (<2 minutes) you'll have a working full-stack app using:
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+- Convex as your backend (database, server logic)
+- [React](https://react.dev/) as your frontend (web page interactivity)
+- [Next.js](https://nextjs.org/) for optimized web hosting and page routing
+- [Tailwind](https://tailwindcss.com/) for building great looking accessible UI
+- [Convex Auth](https://labs.convex.dev/auth) for authentication
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+## Get started
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+If you just cloned this codebase and didn't use `npm create convex`, run:
 
-## Learn More
+```
+npm install
+npm run dev
+```
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+If you're reading this README on GitHub and want to use this template, run:
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+```
+npm create convex@latest -- -t nextjs-convexauth
+```
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+## Learn more
 
-## How do I deploy this?
+To learn more about developing your project with Convex, check out:
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+- The [Tour of Convex](https://docs.convex.dev/get-started) for a thorough introduction to Convex principles.
+- The rest of [Convex docs](https://docs.convex.dev/) to learn about all Convex features.
+- [Stack](https://stack.convex.dev/) for in-depth articles on advanced topics.
+- [Convex Auth docs](https://labs.convex.dev/auth) for documentation on the Convex Auth library.
+
+## Configuring other authentication methods
+
+To configure different authentication methods, see [Configuration](https://labs.convex.dev/auth/config) in the Convex Auth docs.
+
+## Join the community
+
+Join thousands of developers building full-stack apps with Convex:
+
+- Join the [Convex Discord community](https://convex.dev/community) to get help in real-time.
+- Follow [Convex on GitHub](https://github.com/get-convex/), star and contribute to the open-source implementation of Convex.
