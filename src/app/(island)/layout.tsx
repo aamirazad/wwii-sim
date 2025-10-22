@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import "./globals.css";
+import "../globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import ConvexClientProvider from "@/components/ConvexClientProvider";
 import Sidebar from "@/components/Sidebar";
+import BodyIsland from "@/components/BodyIsland";
 
 export const metadata: Metadata = {
 	title: "HASD WW2 Sim",
@@ -19,12 +20,16 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html suppressHydrationWarning={true} lang="en">
-			<body>
+		<html
+			suppressHydrationWarning={true}
+			className="dark text-white bg-slate-950"
+			lang="en"
+		>
+			<body className="flex gap-6">
 				<ClerkProvider dynamic>
 					<ConvexClientProvider>
 						<Sidebar />
-						{children}
+						<BodyIsland>{children}</BodyIsland>
 					</ConvexClientProvider>
 				</ClerkProvider>
 			</body>

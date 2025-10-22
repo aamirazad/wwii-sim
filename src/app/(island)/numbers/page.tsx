@@ -13,11 +13,8 @@ import { api } from "~/convex/_generated/api";
 export default function Home() {
 	return (
 		<>
-			<header className="sticky top-0 z-10 flex flex-row items-center justify-between border-slate-200 border-b-2 bg-background p-4 dark:border-slate-800">
-				Convex + Next.js + Clerk
-				<UserButton />
-			</header>
 			<main className="flex flex-col gap-8 p-8">
+				<UserButton />
 				<h1 className="text-center font-bold text-4xl">
 					Convex + Next.js + Clerk
 				</h1>
