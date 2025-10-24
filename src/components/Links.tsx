@@ -17,7 +17,7 @@ export function InlineLink({
 		<Link
 			className={
 				"underline underline-offset-5 hover:opacity-80" +
-				(className ? ` ${className}` : "")
+				(className ? `${className}` : "")
 			}
 			href={href}
 			rel={rel}

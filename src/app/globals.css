@@ -1,4 +1,83 @@
 /** biome-ignore-all lint/suspicious/noUnknownAtRules: tailwind magic */
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
+:root {
+	--bg: #0b0d10; /* gunmetal */
+	--bg-2: #0a0b0e;
+	--island: #0e1116; /* neutral warm dark */
+	--card: #0f1217;
+	--muted: #a1a1aa; /* zinc-400 */
+	--accent: #f97316; /* orange-500 */
+	--accent-700: #ea580c; /* orange-600/700 */
+}
+
+/* App background with two subtle radial orange glows + dark gradient. */
+.app-bg {
+	background:
+		radial-gradient(
+			800px 800px at 0% 0%,
+			color-mix(in srgb, var(--accent) 12%, transparent) 0%,
+			transparent 60%
+		),
+		radial-gradient(
+			900px 900px at 100% 100%,
+			color-mix(in srgb, var(--accent-700) 10%, transparent) 0%,
+			transparent 60%
+		), linear-gradient(to bottom, var(--bg), var(--bg-2));
+	background-attachment: fixed;
+}
+
+/* Improve default text rendering, selection, and focus rings */
+html {
+	text-rendering: optimizeLegibility;
+}
+body {
+	color: #e5e7eb; /* gray-200 */
+}
+::selection {
+	background: color-mix(in srgb, var(--accent) 35%, transparent);
+	color: white;
+}
+
+/* Thin, unobtrusive scrollbars for dark mode */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: #52525b var(--bg); /* zinc-600 */
+}
+*::-webkit-scrollbar {
+	height: 8px;
+	width: 8px;
+}
+*::-webkit-scrollbar-thumb {
+	background: #52525b; /* zinc-600 */
+	border-radius: 9999px;
+}
+*::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+/* Subtle orange text glow helper */
+.text-glow-orange {
+	text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* Reusable 'island' surface and focus ring */
+.island {
+	background: linear-gradient(
+		180deg,
+		rgba(14, 17, 22, 0.9),
+		rgba(8, 10, 14, 0.9)
+	);
+	border: 1px solid rgba(249, 115, 22, 0.12);
+	@apply my-6 rounded-3xl shadow-2xl overflow-hidden transition-all duration-300;
+}
+
+.island:hover {
+	border: 1px solid rgba(249, 115, 22, 0.2);
+}
+
+/* Performance helper for large content areas */
+.content-visibility-auto {
+	content-visibility: auto;
+	contain-intrinsic-size: 1px 1000px;
+}

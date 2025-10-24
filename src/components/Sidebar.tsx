@@ -1,20 +1,25 @@
 import Link from "next/link";
+import { ViewTransition } from "react";
 
 export default function Sidebar() {
 	return (
-		// The sidebar should be so rounded that it looks like an island on the side, not touching or comling close to the left or top edges
-
-		<aside className="w-64 backdrop-blur-md shadow-xl p-4 flex flex-col justify-between">
-			<div className="rounded-xl bg-slate-200 dark:bg-slate-700 px-4 py-2 h-full">
-				<h2 className="mb-4 font-bold text-2xl">
-					<Link href="/">HASD WW2 Sim</Link>
-				</h2>
-				<ul className="space-y-2">
-					<ListItem href="/numbers">Numbers</ListItem>
-					<ListItem href="/dashboard">Dashboard</ListItem>
-					<ListItem href="/test">Test</ListItem>
-					<ListItem href="/test2">Test2</ListItem>
-				</ul>
+		<aside className="flex w-64 shrink-0 flex-col justify-between">
+			<div className="island flex h-full flex-col">
+				<div className="shrink-0 border-orange-900/30 border-b px-6 py-5">
+					<h2 className="font-extrabold text-2xl tracking-tight">
+						<Link href="/" className="text-white hover:opacity-90">
+							<ViewTransition name="title">
+								HASD <span className="text-orange-400">WW2</span> Sim
+							</ViewTransition>
+						</Link>
+					</h2>
+				</div>
+				<nav className="flex-1 overflow-y-auto p-4">
+					<ul className="space-y-2">
+						<ListItem href="/numbers">Numbers</ListItem>
+						<ListItem href="/test2">Long Text</ListItem>
+					</ul>
+				</nav>
 			</div>
 		</aside>
 	);
@@ -31,7 +36,7 @@ function ListItem({
 		<li>
 			<Link
 				href={href}
-				className="block items-center px-4 py-3 rounded-2xl bg-slate-600"
+				className="block items-center rounded-2xl bg-neutral-900/70 px-4 py-3 text-zinc-200 transition-colors hover:bg-neutral-800/70 focus-visible:bg-neutral-800/70"
 			>
 				{children}
 			</Link>
