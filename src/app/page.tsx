@@ -1,17 +1,13 @@
 import Link from "next/link";
-import { ViewTransition } from "react";
 
 export default function LandingPage() {
 	return (
 		<>
 			<main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-5xl flex-col items-center justify-center gap-10 px-6 py-8">
 				<section className="text-center">
-					<ViewTransition name="title">
-						<h1 className="bg-clip-text font-extrabold text-4xl text-glow-orange text-white tracking-tight sm:text-5xl md:text-6xl">
-							HASD WW2 Simulation
-						</h1>
-					</ViewTransition>
-
+					<h1 className="bg-clip-text font-extrabold text-4xl text-glow-orange text-white tracking-tight sm:text-5xl md:text-6xl">
+						HASD WW2 Simulation
+					</h1>
 					<p className="mx-auto mt-4 max-w-2xl text-balance text-zinc-300">
 						Learn history by playing it. Coordinate and strategize as nations in
 						the Second World War. Wage war, forge alliances, and have fun.

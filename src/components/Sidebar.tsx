@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ViewTransition } from "react";
 
 export default function Sidebar() {
 	return (
@@ -8,9 +7,7 @@ export default function Sidebar() {
 				<div className="shrink-0 border-orange-900/30 border-b px-6 py-5">
 					<h2 className="font-extrabold text-2xl tracking-tight">
 						<Link href="/" className="text-white hover:opacity-90">
-							<ViewTransition name="title">
-								HASD <span className="text-orange-400">WW2</span> Sim
-							</ViewTransition>
+							HASD <span className="text-orange-400">WW2</span> Sim
 						</Link>
 					</h2>
 				</div>
