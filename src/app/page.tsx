@@ -1,6 +1,10 @@
+"use client";
 import Link from "next/link";
+import { useState } from "react";
+import LoaderPinwheel from "@/components/icons/LoaderPinwheel";
 
 export default function LandingPage() {
+	const [loading, setLoading] = useState(false);
 	return (
 		<>
 			<main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-5xl flex-col items-center justify-center gap-10 px-6 py-8">
@@ -17,10 +21,15 @@ export default function LandingPage() {
 				<div className="flex flex-wrap items-center justify-center gap-4">
 					<Link
 						href="/numbers"
-						className="rounded-2xl bg-orange-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-orange-500 focus-visible:bg-orange-500"
+						onClick={() => {
+							setLoading(true);
+						}}
+						className="flex rounded-2xl bg-orange-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-orange-500 focus-visible:bg-orange-500"
 					>
 						Enter the App
+						<LoaderPinwheel className={loading ? "block" : "hidden"} />
 					</Link>
+
 					<Link
 						href="/help"
 						className="rounded-2xl border border-orange-900/40 bg-slate-900/60 px-6 py-3 text-slate-200 transition-colors hover:bg-slate-800/60 focus-visible:bg-slate-800/60"
