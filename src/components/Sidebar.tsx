@@ -14,7 +14,7 @@ export default function Sidebar() {
 				<nav className="flex-1 overflow-y-auto p-4">
 					<ul className="space-y-2">
 						<ListItem href="/numbers">Numbers</ListItem>
-						<ListItem href="/test2">Long Text</ListItem>
+						<ListItem href="/help">Long Text</ListItem>
 					</ul>
 				</nav>
 			</div>

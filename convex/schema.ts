@@ -8,7 +8,7 @@ import { v } from "convex/values";
 export default defineSchema({
 	numbers: defineTable({
 		value: v.number(),
-		userId: v.optional(v.string())
+		userId: v.optional(v.string()),
 	}),
 	users: defineTable({
 		name: v.string(),
