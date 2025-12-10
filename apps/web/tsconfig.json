@@ -5,7 +5,12 @@
 			{
 				"name": "next"
 			}
-		]
+		],
+		"baseUrl": ".",
+		"paths": {
+			"@web/*": ["./*"],
+			"@api/*": ["../api/*"]
+		}
 	},
 	"include": [
 		"**/*.ts",
