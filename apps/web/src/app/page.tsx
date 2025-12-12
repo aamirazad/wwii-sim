@@ -1,4 +1,4 @@
-import { elysia } from "@api/src/client";
+import { elysia } from "@api/client";
 
 export default async function Home() {
 	const data = await elysia.get();
