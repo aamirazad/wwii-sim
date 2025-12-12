@@ -8,5 +8,5 @@ import type { App } from "./index";
 //       next:{revalidate:0}
 //     },
 //   })
-const url = process.env.URL_DOMAIN ?? "localhost:3001";
+const url = process.env.NEXT_PUBLIC_API_URL ?? "localhost:3001";
 export const elysia = treaty<App>(url);

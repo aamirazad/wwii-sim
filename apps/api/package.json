@@ -11,8 +11,9 @@
 		"@elysiajs/eden": "catalog:"
 	},
 	"devDependencies": {
-		"bun-types": "^1.3.4",
-		"@biomejs/biome": "catalog:"
+		"@biomejs/biome": "catalog:",
+		"@types/node": "catalog:",
+		"bun-types": "^1.3.4"
 	},
 	"module": "src/index.js"
 }
