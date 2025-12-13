@@ -11,22 +11,29 @@ const app = new Elysia()
 		open(ws) {
 			ws.subscribe("global");
 			const msg: ServerMessage = {
-				type: "server:connected",
+				type: "server.connected",
 				apiVersion: packageJson.version,
 				counter,
 			};
 			ws.send(msg);
 		},
-		message(ws, message) {
-			const msg = message as unknown as ClientMessage;
-			if (msg.type === "client:counter:increment") {
-				counter++;
-				const update: ServerMessage = {
-					type: "server:counter",
-					counter,
-				};
-				ws.publish("global", update);
-				ws.send(update);
+		message(ws, message: ClientMessage) {
+			const msg = message;
+			switch (msg.type) {
+				case "client.counter.increment": {
+					counter++;
+					const update: ServerMessage = {
+						type: "server.counter",
+						counter,
+					};
+					ws.publish("global", update);
+					ws.send(update);
+					break;
+				}
+				case "client.game.set_time_offset": {
+					scheduleNewYear(msg.seconds);
+					console.log(`schedule ${msg.seconds}`);
+				}
 			}
 		},
 		close(ws) {
@@ -35,10 +42,32 @@ const app = new Elysia()
 	})
 	.listen(3001);
 
+function scheduleNewYear(targetSecond: number) {
+	const now = new Date();
+	let delay = targetSecond - now.getSeconds();
+	if (delay < 0) {
+		delay += 60;
+	}
+	const delayMs = delay * 1000;
+	console.log(delayMs);
+	setTimeout(() => {
+		newYear();
+		setInterval(newYear, 60000);
+	}, delayMs);
+}
+
+function newYear() {
+	const msg: ServerMessage = {
+		type: "server.announce",
+		announcement: `Happy New Year! It is now ${new Date().toLocaleTimeString()}`,
+	};
+	app.server?.publish("global", JSON.stringify(msg));
+}
+
 setInterval(() => {
 	const msg: ServerMessage = {
-		type: "server:time",
-		time: new Date().toISOString(),
+		type: "server.announce",
+		announcement: new Date().toISOString(),
 	};
 	// app.server.publish requires string for raw Bun server, but Elysia might wrap it.
 	// To be safe and consistent with ws.send(obj) which stringifies, we should stringify here
@@ -47,7 +76,7 @@ setInterval(() => {
 	// However, app.server.publish is the raw Bun publish.
 	// So we must stringify it manually.
 	app.server?.publish("global", JSON.stringify(msg));
-}, 6000);
+}, 60000);
 
 console.log(
 	`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`,
