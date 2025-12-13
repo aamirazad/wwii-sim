@@ -3,6 +3,7 @@
 <details>
 <summary>All commits</summary>
 
+- **Feature**: merge bot commit changelog on feature branch ([#26](https://github.com/aamirazad/ww2-sim/pull/26)) by [@aamirazad](https://github.com/aamirazad) - [`b4509b3...8aab4e0`](https://github.com/aamirazad/ww2-sim/compare/b4509b3...8aab4e0)
 - **Feature**: add links to oreo pictures ([#25](https://github.com/aamirazad/ww2-sim/pull/25)) by [@aamirazad](https://github.com/aamirazad) - [`2f0320b...a42f98f`](https://github.com/aamirazad/ww2-sim/compare/2f0320b...a42f98f)
 - **Feature**: turbo monorepo with nextjs frontend and elysia backend ([#24](https://github.com/aamirazad/ww2-sim/pull/24)) by [@aamirazad](https://github.com/aamirazad) - [`22da028...2eff9fe`](https://github.com/aamirazad/ww2-sim/compare/22da028...2eff9fe)
 - **Other**: update nextjs ([#23](https://github.com/aamirazad/WW2-Sim/pull/23)) by [@aamirazad](https://github.com/aamirazad) - [`b7b399f...22bf19a`](https://github.com/aamirazad/WW2-Sim/compare/b7b399f...22bf19a)
