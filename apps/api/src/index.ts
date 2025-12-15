@@ -1,8 +1,28 @@
 import { Elysia } from "elysia";
 import packageJson from "../package.json";
-import type { ClientMessage, ServerMessage } from "./ws-events";
+import {
+	type ClientMessage,
+	COUNTRIES,
+	type Country,
+	type ServerMessage,
+} from "./ws-events";
 
 let counter = 0;
+
+// In-memory state for countries
+const countryState: Record<
+	Country,
+	{ oil: number; steel: number; population: number }
+> = {
+	Commonwealth: { oil: 10, steel: 10, population: 10 },
+	France: { oil: 10, steel: 10, population: 10 },
+	Germany: { oil: 10, steel: 10, population: 10 },
+	Italy: { oil: 10, steel: 10, population: 10 },
+	Japan: { oil: 10, steel: 10, population: 10 },
+	Russia: { oil: 10, steel: 10, population: 10 },
+	UK: { oil: 10, steel: 10, population: 10 },
+	USA: { oil: 10, steel: 10, population: 10 },
+};
 
 const app = new Elysia()
 	.get("/", () => "Hello Elysia")
@@ -33,11 +53,49 @@ const app = new Elysia()
 				case "client.game.set_time_offset": {
 					scheduleNewYear(msg.seconds);
 					console.log(`schedule ${msg.seconds}`);
+					break;
+				}
+				case "client.join_country": {
+					const { country, username } = msg;
+					if (COUNTRIES.includes(country as Country)) {
+						ws.subscribe(`country.${country}`);
+						console.log(`${username} joined ${country}`);
+						const stateMsg: ServerMessage = {
+							type: "server.country_state",
+							country,
+							resources: countryState[country as Country],
+						};
+						ws.send(stateMsg);
+					}
+					break;
+				}
+				case "client.update_resource": {
+					const { country, resource, value } = msg;
+					if (
+						COUNTRIES.includes(country as Country) &&
+						["oil", "steel", "population"].includes(resource)
+					) {
+						const c = country as Country;
+						// @ts-expect-error
+						countryState[c][resource] = value;
+						const updateMsg: ServerMessage = {
+							type: "server.resource_updated",
+							country,
+							resource,
+							value,
+						};
+						ws.publish(`country.${country}`, updateMsg);
+						ws.send(updateMsg); // Send to sender as well if publish doesn't include sender (Elysia usually doesn't)
+					}
+					break;
 				}
 			}
 		},
 		close(ws) {
 			ws.unsubscribe("global");
+			for (const c of COUNTRIES) {
+				ws.unsubscribe(`country.${c}`);
+			}
 		},
 	})
 	.listen(3001);
