@@ -1,4 +1,4 @@
-# Contributing to Trellium Projects
+# Contributing
 
 First off, thanks for taking the time to contribute!
 
@@ -34,11 +34,11 @@ By participating, you are expected to uphold this code. Please report unacceptab
 
 > If you want to ask a question, we assume that you have read the available [Documentation](https://sim.aamirazad.com/help).
 
-Before you ask a question, it is best to search for existing [Issues](https://github.com/aamirazad/WW2-Sim/issues) that might help you. In case you have found a suitable issue and still need clarification, you can write your question in this issue. It is also advisable to search the internet for answers first.
+Before you ask a question, it is best to search for existing [Issues](https://github.com/aamirazad/wwii-sim/issues) that might help you. In case you have found a suitable issue and still need clarification, you can write your question in this issue. It is also advisable to search the internet for answers first.
 
 If you then still feel the need to ask a question and need clarification, we recommend the following:
 
-- Open an [Issue](https://github.com/aamirazad/WW2-Sim/issues/new).
+- Open an [Issue](https://github.com/aamirazad/wwii-sim/issues/new).
 - Provide as much context as you can about what you're running into.
 - Provide project and go versions, depending on what seems relevant.
 
@@ -57,7 +57,7 @@ We will then take care of the issue as soon as possible.
 A good bug report shouldn't leave others needing to chase you up for more information. Therefore, we ask you to investigate carefully, collect information and describe the issue in detail in your report. Please complete the following steps in advance to help us fix any potential bug as fast as possible.
 - Make sure that you are using the latest version.
 - Determine if your bug is really a bug and not an error on your side, e.g. using incompatible environment components/versions (Make sure that you have read the [documentation](https://sim.aamirazad.com/help). If you are looking for support, you might want to check [this section](#i-have-a-question)).
-- To see if other users have experienced (and potentially already solved) the same issue you are having, check if there is not already a bug report existing for your bug or error in the [bug tracker](https://github.com/aamirazad/WW2-Sim/issues?q=sort%3Aupdated-desc%20is%3Aissue%20label%3Abug).
+- To see if other users have experienced (and potentially already solved) the same issue you are having, check if there is not already a bug report existing for your bug or error in the [bug tracker](https://github.com/aamirazad/wwii-sim/issues?q=sort%3Aupdated-desc%20is%3Aissue%20label%3Abug).
 - Also make sure to search the internet to see if users outside the GitHub community have discussed the issue.
 - Collect information about the bug:
     - Stack trace (Traceback)
@@ -80,7 +80,7 @@ Once it's filed:
 
 - We will label the issue accordingly.
 - We will try to reproduce the issue with your provided steps. If there are no reproduction steps or no obvious way to reproduce the issue, we will ask you for those steps. Bugs will not be addressed until they can be reproduced.
-- If we are able to reproduce the issue, it will be added to our [project tracker](https://github.com/users/aamirazad/projects/5) with a severity attached if necessary. At this point, we likely will work independently and mark the issue as complete whenever it is complete. Please refrain from asking for updates from us, instead watching the bug in our tracker will provide all the information you need.
+- If we are able to reproduce the issue, it will be added to our [project tracker](https://github.com/users/aamirazad/projects/7) with a severity attached if necessary. At this point, we likely will work independently and mark the issue as complete whenever it is complete. Please refrain from asking for updates from us, instead watching the bug in our tracker will provide all the information you need.
 
 ### Suggesting Enhancements
 

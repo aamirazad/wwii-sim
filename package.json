@@ -1,5 +1,5 @@
 {
-	"name": "ww2-sim",
+	"name": "wwii-sim",
 	"private": true,
 	"scripts": {
 		"build": "turbo run build",
@@ -9,7 +9,6 @@
 	},
 	"catalog": {
 		"@biomejs/biome": "2.3.8",
-		"turbo": "^2.6.3",
 		"typescript": "5.9.3",
 		"@elysiajs/eden": "^1.4.5",
 		"@types/node": "^25.0.1"
@@ -18,5 +17,8 @@
 	"workspaces": [
 		"apps/*",
 		"packages/*"
-	]
+	],
+	"devDependencies": {
+		"turbo": "^2.6.3"
+	}
 }
