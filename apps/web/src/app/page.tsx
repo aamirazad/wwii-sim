@@ -1,20 +1,28 @@
 "use client";
 
 import type { ClientMessage, ServerMessage } from "@api/ws-events";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import CountryDashboard from "@/components/CountryDashboard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Command,
+	CommandEmpty,
+	CommandGroup,
+	CommandInput,
+	CommandItem,
+	CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import packageJson from "../../package.json";
 
 const COUNTRIES = [
@@ -38,6 +46,7 @@ export default function Home() {
 		population: 0,
 	});
 	const [apiVersion, setApiVersion] = useState<string | null>(null);
+	const [open, setOpen] = useState(false);
 
 	const wsUrl = process.env.NEXT_PUBLIC_API_WS_URL || "ws://localhost:3001/ws";
 
@@ -144,22 +153,53 @@ export default function Home() {
 							/>
 						</div>
 						<div className="space-y-2">
-							<Label htmlFor="country">Select Country</Label>
-							<Select
-								value={selectedCountry}
-								onValueChange={setSelectedCountry}
-							>
-								<SelectTrigger id="country">
-									<SelectValue>Select a country</SelectValue>
-								</SelectTrigger>
-								<SelectContent>
-									{COUNTRIES.map((c) => (
-										<SelectItem key={c} value={c}>
-											{c}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+							<Popover open={open} onOpenChange={setOpen}>
+								<PopoverTrigger
+									render={
+										<Button
+											variant="outline"
+											aria-expanded={open}
+											className="w-full justify-between"
+										>
+											{selectedCountry || "Select your country"}
+											<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+										</Button>
+									}
+								></PopoverTrigger>
+								<PopoverContent className="w-[200px] p-0">
+									<Command>
+										<CommandInput
+											placeholder="Search framework..."
+											className="h-9"
+										/>
+										<CommandList>
+											<CommandEmpty>No framework found.</CommandEmpty>
+											<CommandGroup>
+												{COUNTRIES.map((country) => (
+													<CommandItem
+														key={country}
+														value={country}
+														onSelect={(selected) => {
+															setSelectedCountry(selected);
+															setOpen(false);
+														}}
+													>
+														{country}
+														<Check
+															className={cn(
+																"ml-auto",
+																selectedCountry === country
+																	? "opacity-100"
+																	: "opacity-0",
+															)}
+														/>
+													</CommandItem>
+												))}
+											</CommandGroup>
+										</CommandList>
+									</Command>
+								</PopoverContent>
+							</Popover>
 						</div>
 						<Button
 							className="w-full"
