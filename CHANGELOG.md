@@ -3,6 +3,7 @@
 <details>
 <summary>All commits</summary>
 
+- **Feature**(web): country select combobox ([#31](https://github.com/aamirazad/wwii-sim/pull/31)) by [@aamirazad](https://github.com/aamirazad) - [`b57726d...52c9af4`](https://github.com/aamirazad/wwii-sim/compare/b57726d...52c9af4)
 - **Other**: rename project to wwii ([#30](https://github.com/aamirazad/wwii-sim/pull/30)) by [@aamirazad](https://github.com/aamirazad) - [`f3513d9...d5f2422`](https://github.com/aamirazad/wwii-sim/compare/f3513d9...d5f2422)
 - **Feature**: basic resource tracking with websockets ([#29](https://github.com/aamirazad/wwii-sim/pull/29)) by [@aamirazad](https://github.com/aamirazad) - [`eba4a5e...a6e9f9f`](https://github.com/aamirazad/wwii-sim/compare/eba4a5e...a6e9f9f)
 - **Feature**: timed events ([#27](https://github.com/aamirazad/wwii-sim/pull/27)) by [@aamirazad](https://github.com/aamirazad) - [`f6fe4d1...a4f7b4d`](https://github.com/aamirazad/wwii-sim/compare/f6fe4d1...a4f7b4d)
