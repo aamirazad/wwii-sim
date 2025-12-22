@@ -3,7 +3,7 @@
 
 import { Effect, EffectComposer, EffectPass, RenderPass } from "postprocessing";
 import type React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 type PixelBlastVariant = "square" | "circle" | "triangle" | "diamond";
@@ -374,6 +374,7 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
 	edgeFade = 0.5,
 	noiseAmount = 0,
 }) => {
+	const [isLoaded, setIsLoaded] = useState(false);
 	const containerRef = useRef<HTMLDivElement | null>(null);
 	const visibilityRef = useRef({ visible: true });
 	const speedRef = useRef(speed);
@@ -411,6 +412,10 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
 		liquidEffect?: Effect;
 	} | null>(null);
 	const prevConfigRef = useRef<ReinitConfig | null>(null);
+	useEffect(() => {
+		setIsLoaded(true);
+	}, []);
+
 	useEffect(() => {
 		const container = containerRef.current;
 		if (!container) return;
@@ -713,7 +718,7 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
 	return (
 		<div
 			ref={containerRef}
-			className={`w-full h-full relative overflow-hidden ${className ?? ""}`}
+			className={`w-full h-full relative overflow-hidden transition-opacity duration-500 ${isLoaded ? "opacity-100" : "opacity-0"} ${className ?? ""}`}
 			style={style}
 		/>
 	);

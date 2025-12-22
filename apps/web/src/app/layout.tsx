@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Nunito_Sans } from "next/font/google";
+import ExternalLink from "@/components/ExternalLink";
 import "./globals.css";
 
 const nunitoSans = Nunito_Sans({ variable: "--font-nunito" });
@@ -26,19 +27,17 @@ export default function RootLayout({
 			<body
 				className={`${geistMono.variable} ${nunitoSans.variable} dark antialiased flex flex-col min-h-screen`}
 			>
-				<main className="grow">{children}</main>
+				<main className="grow flex flex-col">{children}</main>
 				<footer className="relative z-10 p-4 flex flex-col items-center">
-					<div className="opacity-30 text-sm">
+					<div className="hover:opacity-50 transition-color duration-300 opacity-0 text-sm sp">
 						{commitHash ? (
 							<p>
 								Build{" "}
-								<a
-									target="_blank"
-									rel="noopener noreferrer"
+								<ExternalLink
 									href={`https://github.com/aamirazad/wwii-sim/tree/${process.env.NEXT_PUBLIC_COMMIT_SHA}`}
 								>
 									{commitHash}
-								</a>
+								</ExternalLink>
 							</p>
 						) : null}
 					</div>
