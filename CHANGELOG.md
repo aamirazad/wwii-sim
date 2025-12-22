@@ -3,6 +3,7 @@
 <details>
 <summary>All commits</summary>
 
+- **Feature**(web): pretty pixel blast landing page ([#34](https://github.com/aamirazad/wwii-sim/pull/34)) by [@aamirazad](https://github.com/aamirazad) - [`0f9952d...d9a3070`](https://github.com/aamirazad/wwii-sim/compare/0f9952d...d9a3070)
 - **Feature**(web): websocket loading ([#33](https://github.com/aamirazad/wwii-sim/pull/33)) by [@aamirazad](https://github.com/aamirazad) - [`063d553...cf27cd6`](https://github.com/aamirazad/wwii-sim/compare/063d553...cf27cd6)
 - **Feature**(merge bot): disallow merge bot concurrency ([#32](https://github.com/aamirazad/wwii-sim/pull/32)) by [@aamirazad](https://github.com/aamirazad) - [`da22610...e1fbdae`](https://github.com/aamirazad/wwii-sim/compare/da22610...e1fbdae)
 - **Feature**(web): country select combobox ([#31](https://github.com/aamirazad/wwii-sim/pull/31)) by [@aamirazad](https://github.com/aamirazad) - [`b57726d...52c9af4`](https://github.com/aamirazad/wwii-sim/compare/b57726d...52c9af4)
