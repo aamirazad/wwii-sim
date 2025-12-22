@@ -3,6 +3,7 @@
 <details>
 <summary>All commits</summary>
 
+- **Feature**(web): websocket loading ([#33](https://github.com/aamirazad/wwii-sim/pull/33)) by [@aamirazad](https://github.com/aamirazad) - [`063d553...cf27cd6`](https://github.com/aamirazad/wwii-sim/compare/063d553...cf27cd6)
 - **Feature**(merge bot): disallow merge bot concurrency ([#32](https://github.com/aamirazad/wwii-sim/pull/32)) by [@aamirazad](https://github.com/aamirazad) - [`da22610...e1fbdae`](https://github.com/aamirazad/wwii-sim/compare/da22610...e1fbdae)
 - **Feature**(web): country select combobox ([#31](https://github.com/aamirazad/wwii-sim/pull/31)) by [@aamirazad](https://github.com/aamirazad) - [`b57726d...52c9af4`](https://github.com/aamirazad/wwii-sim/compare/b57726d...52c9af4)
 - **Other**: rename project to wwii ([#30](https://github.com/aamirazad/wwii-sim/pull/30)) by [@aamirazad](https://github.com/aamirazad) - [`f3513d9...d5f2422`](https://github.com/aamirazad/wwii-sim/compare/f3513d9...d5f2422)
