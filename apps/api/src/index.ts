@@ -1,140 +1,128 @@
-import { Elysia } from "elysia";
+import { fromTypes, openapi } from "@elysiajs/openapi";
+import { eq } from "drizzle-orm";
+import { Elysia, t } from "elysia";
 import packageJson from "../package.json";
-import {
-	type ClientMessage,
-	COUNTRIES,
-	type Country,
-	type ServerMessage,
-} from "./ws-events";
-
-let counter = 0;
-
-// In-memory state for countries
-const countryState: Record<
-	Country,
-	{ oil: number; steel: number; population: number }
-> = {
-	Commonwealth: { oil: 10, steel: 10, population: 10 },
-	France: { oil: 10, steel: 10, population: 10 },
-	Germany: { oil: 10, steel: 10, population: 10 },
-	Italy: { oil: 10, steel: 10, population: 10 },
-	Japan: { oil: 10, steel: 10, population: 10 },
-	Russia: { oil: 10, steel: 10, population: 10 },
-	UK: { oil: 10, steel: 10, population: 10 },
-	USA: { oil: 10, steel: 10, population: 10 },
-};
+import { db } from "./db";
+import { usersTable } from "./db/schema";
+import * as schema from "./schema";
 
 const app = new Elysia()
-	.get("/", () => "Hello Elysia")
-	.get("/ping", () => "Pong")
+	.use(
+		openapi({
+			references: fromTypes(),
+			documentation: {
+				info: {
+					title: "WWII Simulation API Docs",
+					version: packageJson.version,
+				},
+			},
+		}),
+	)
+
+	.get("/", () => "WWII Sim API", {
+		detail: {
+			summary: "Root Endpoint",
+			description: "Returns a string indicating that this the API route",
+			tags: ["Utility"],
+		},
+	})
+	.get("/ping", () => `Pong`, {
+		detail: {
+			summary: "Health Check",
+			description: "Returns 'Pong' to verify the server is alive.",
+			tags: ["Utility"],
+		},
+	})
+	// Websocket
 	.ws("/ws", {
+		body: schema.ClientMessageSchema,
+		response: schema.ServerMessageSchema,
 		open(ws) {
-			ws.subscribe("global");
-			const msg: ServerMessage = {
+			console.log(`User Connected`);
+			ws.send({
 				type: "server.connected",
 				apiVersion: packageJson.version,
-				counter,
-			};
-			ws.send(msg);
+			});
 		},
-		message(ws, message: ClientMessage) {
-			const msg = message;
-			switch (msg.type) {
-				case "client.counter.increment": {
-					counter++;
-					const update: ServerMessage = {
-						type: "server.counter",
-						counter,
-					};
-					ws.publish("global", update);
-					ws.send(update);
-					break;
-				}
-				case "client.game.set_time_offset": {
-					scheduleNewYear(msg.seconds);
-					console.log(`schedule ${msg.seconds}`);
-					break;
-				}
-				case "client.join_country": {
-					const { country, username } = msg;
-					if (COUNTRIES.includes(country as Country)) {
-						ws.subscribe(`country.${country}`);
-						console.log(`${username} joined ${country}`);
-						const stateMsg: ServerMessage = {
-							type: "server.country_state",
-							country,
-							resources: countryState[country as Country],
-						};
-						ws.send(stateMsg);
-					}
-					break;
-				}
-				case "client.update_resource": {
-					const { country, resource, value } = msg;
-					if (
-						COUNTRIES.includes(country as Country) &&
-						["oil", "steel", "population"].includes(resource)
-					) {
-						const c = country as Country;
-						// @ts-expect-error
-						countryState[c][resource] = value;
-						const updateMsg: ServerMessage = {
-							type: "server.resource_updated",
-							country,
-							resource,
-							value,
-						};
-						ws.publish(`country.${country}`, updateMsg);
-						ws.send(updateMsg); // Send to sender as well if publish doesn't include sender (Elysia usually doesn't)
-					}
-					break;
-				}
+		async message(ws, message) {
+			const [authenticatedUser] = await db
+				.select()
+				.from(usersTable)
+				.where((table) => eq(table.id, message.token));
+
+			if (!authenticatedUser) {
+				ws.send({
+					type: "server.authError",
+					message: "Missing or invalid Authorization header",
+				});
+				return;
 			}
+			console.log("extra");
 		},
 		close(ws) {
 			ws.unsubscribe("global");
-			for (const c of COUNTRIES) {
-				ws.unsubscribe(`country.${c}`);
-			}
 		},
 	})
+	// API
+	.guard({
+		headers: t.Object({
+			authorization: t.String(),
+		}),
+	})
+	.onBeforeHandle(async ({ headers, set }) => {
+		const authHeader = headers.authorization;
+
+		if (!authHeader) {
+			set.status = 401;
+			return { message: "Missing or invalid Authorization header" };
+		}
+
+		const user = await db
+			.select()
+			.from(usersTable)
+			.where((table) => eq(table.id, authHeader));
+
+		if (user.length === 0) {
+			set.status = 401;
+			return { message: "Missing or invalid Authorization header" };
+		}
+	})
+	.get(
+		"/users",
+		async () => {
+			const users = await db.select().from(usersTable);
+			return users;
+		},
+		{
+			detail: {
+				summary: "List Users",
+				description: "Returns all users.",
+				tags: ["User"],
+			},
+		},
+	)
+	.post(
+		"/users",
+		async ({ body }) => {
+			console.log(`Creating user ${body.name}`);
+			const [newUser] = await db.insert(usersTable).values(body).returning();
+			return newUser;
+		},
+		{
+			body: t.Object({
+				username: t.String(),
+				name: t.String(),
+				email: t.String(),
+				role: t.String(),
+			}),
+			detail: {
+				summary: "Create User",
+				description: "Creates a new user in the database.",
+				tags: ["User"],
+			},
+		},
+	)
 	.listen(3001);
-
-function scheduleNewYear(targetSecond: number) {
-	const now = new Date();
-	let delay = targetSecond - now.getSeconds();
-	if (delay < 0) {
-		delay += 60;
-	}
-	const delayMs = delay * 1000;
-	console.log(delayMs);
-	setTimeout(() => {
-		newYear();
-		setInterval(newYear, 60000);
-	}, delayMs);
-}
-
-function newYear() {
-	const msg: ServerMessage = {
-		type: "server.announce",
-		announcement: `Happy New Year! It is now ${new Date().toLocaleTimeString()}`,
-	};
-	app.server?.publish("global", JSON.stringify(msg));
-}
-
-setInterval(() => {
-	const msg: ServerMessage = {
-		type: "server.announce",
-		announcement: new Date().toISOString(),
-	};
-	// app.server.publish requires string for raw Bun server, but Elysia might wrap it.
-	// To be safe and consistent with ws.send(obj) which stringifies, we should stringify here
-	// IF ws.send(obj) stringifies.
-	// Elysia WS automatically parses/stringifies JSON.
-	// However, app.server.publish is the raw Bun publish.
-	// So we must stringify it manually.
-	app.server?.publish("global", JSON.stringify(msg));
-}, 60000);
 
 console.log(
 	`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`,

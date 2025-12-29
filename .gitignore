@@ -27,7 +27,7 @@ out/
 build
 dist
 apps/api/server
-
+*.sqlite
 
 # Debug
 npm-debug.log*
