@@ -11,6 +11,7 @@
 		"lint": "biome check"
 	},
 	"dependencies": {
+		"@elysiajs/cors": "^1.4.1",
 		"@elysiajs/eden": "catalog:",
 		"@elysiajs/openapi": "^1.4.13",
 		"@paralleldrive/cuid2": "^3.0.4",
