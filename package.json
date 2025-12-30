@@ -1,10 +1,11 @@
 {
 	"name": "wwii-sim",
 	"devDependencies": {
+		"@biomejs/biome": "2.3.10",
 		"turbo": "^2.6.3"
 	},
 	"catalog": {
-		"@biomejs/biome": "2.3.8",
+		"@biomejs/biome": "2.3.10",
 		"typescript": "5.9.3",
 		"@elysiajs/eden": "^1.4.5",
 		"@types/node": "^25.0.1"

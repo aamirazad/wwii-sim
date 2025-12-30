@@ -17,10 +17,6 @@ export type Resource = (typeof RESOURCES)[number];
 
 export const ServerMessageSchema = t.Union([
 	t.Object({
-		type: t.Literal("server.authError"),
-		message: t.String(),
-	}),
-	t.Object({
 		type: t.Literal("server.connected"),
 		apiVersion: t.String(),
 	}),
@@ -31,6 +27,21 @@ export const ServerMessageSchema = t.Union([
 	t.Object({
 		type: t.Literal("server.counter"),
 		counter: t.Number(),
+	}),
+	t.Object({
+		type: t.Literal("server.error"),
+		message: t.String(),
+	}),
+	t.Object({
+		type: t.Literal("server.user"),
+		user: t.Object({
+			id: t.String(),
+			username: t.String(),
+			name: t.String(),
+			email: t.String(),
+			role: t.String(),
+			createdAt: t.Date(),
+		}),
 	}),
 ]);
 

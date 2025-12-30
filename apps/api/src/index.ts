@@ -1,3 +1,4 @@
+import { cors } from "@elysiajs/cors";
 import { fromTypes, openapi } from "@elysiajs/openapi";
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
@@ -18,7 +19,11 @@ const app = new Elysia()
 			},
 		}),
 	)
-
+	.use(
+		cors({
+			origin: process.env.CORS_ORIGIN,
+		}),
+	)
 	.get("/", () => "WWII Sim API", {
 		detail: {
 			summary: "Root Endpoint",
@@ -33,6 +38,44 @@ const app = new Elysia()
 			tags: ["Utility"],
 		},
 	})
+	// Public user lookup endpoint for authentication
+	.get(
+		"/user-exist/:id",
+		async ({ params, set }) => {
+			const [user] = await db
+				.select({ name: usersTable.name })
+				.from(usersTable)
+				.where(eq(usersTable.id, params.id));
+
+			if (!user) {
+				set.status = 404;
+				return { type: "server.error", message: "User not found" };
+			}
+
+			return { type: "server.userExist", name: user.name };
+		},
+		{
+			response: t.Union([
+				t.Object({
+					type: t.Literal("server.userExist"),
+					name: t.String(),
+				}),
+				t.Object({
+					type: t.Literal("server.error"),
+					message: t.String(),
+				}),
+			]),
+			params: t.Object({
+				id: t.String(),
+			}),
+			detail: {
+				summary: "Get User by ID",
+				description:
+					"Checks if a user exists for authentication. Returns their name if found.",
+				tags: ["User"],
+			},
+		},
+	)
 	// Websocket
 	.ws("/ws", {
 		body: schema.ClientMessageSchema,
@@ -52,7 +95,7 @@ const app = new Elysia()
 
 			if (!authenticatedUser) {
 				ws.send({
-					type: "server.authError",
+					type: "server.error",
 					message: "Missing or invalid Authorization header",
 				});
 				return;
@@ -97,6 +140,33 @@ const app = new Elysia()
 			detail: {
 				summary: "List Users",
 				description: "Returns all users.",
+				tags: ["User"],
+			},
+		},
+	)
+	.get(
+		"/users/:id",
+		async ({ params, set }) => {
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, params.id));
+
+			if (!user) {
+				set.status = 404;
+				return { type: "server.error", message: "User not found" };
+			}
+
+			return { type: "server.user", user: user };
+		},
+		{
+			response: schema.ServerMessageSchema,
+			params: t.Object({
+				id: t.String(),
+			}),
+			detail: {
+				summary: "Get User by ID",
+				description: "Returns a single user by their ID.",
 				tags: ["User"],
 			},
 		},
