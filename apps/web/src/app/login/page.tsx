@@ -31,7 +31,7 @@ function App() {
 					expires: Date.now() + 31536000000,
 				});
 			}
-			router.push("/game");
+			router.push("/game/dashboard");
 		}
 	}, [data, isError, isLoading, router, id]);
 
