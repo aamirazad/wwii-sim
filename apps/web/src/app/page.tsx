@@ -1,6 +1,15 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import ExternalLink from "@/components/ExternalLink";
 
 export default async function Homepage() {
+	const cookieStore = await cookies();
+	const userId = cookieStore.get("userId");
+
+	if (userId) {
+		redirect("/game/dashboard");
+	}
+
 	return (
 		<div className="relative pointer-events-none flex flex-col items-center justify-center flex-1">
 			<div className="pointer-events-auto max-w-2/5 text-center">
