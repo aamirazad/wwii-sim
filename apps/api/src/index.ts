@@ -5,12 +5,25 @@ import { Elysia, t } from "elysia";
 import packageJson from "../package.json";
 import { db } from "./db";
 import {
+	COUNTRIES,
+	type Country,
+	countryStateTable,
 	type GameStatus,
 	gamesTable,
+	resourceChangeLogTable,
 	type UserRole,
 	usersTable,
 } from "./db/schema";
-import { ErrorSchema, GameSchema, UserRoleSchema, UserSchema } from "./schema";
+import {
+	CountryStateSchema,
+	CreateGameBodySchema,
+	ErrorSchema,
+	GameSchema,
+	ResourceChangeLogSchema,
+	UserRoleSchema,
+	UserSchema,
+	type YearDurations,
+} from "./schema";
 
 const app = new Elysia()
 	.use(
@@ -64,7 +77,6 @@ const app = new Elysia()
 					username: user.username,
 					name: user.name,
 					role: user.role as UserRole,
-					createdAt: user.createdAt,
 				},
 			};
 		},
@@ -186,7 +198,8 @@ const app = new Elysia()
 				game: {
 					id: game.id,
 					status: game.status as GameStatus,
-					startTime: game.startTime,
+					startDate: game.startDate,
+					yearDurations: game.yearDurations as YearDurations,
 					createdAt: game.createdAt,
 				},
 			};
@@ -235,7 +248,7 @@ const app = new Elysia()
 	)
 	.post(
 		"/game/create",
-		async ({ query, set }) => {
+		async ({ query, body, set }) => {
 			// Check if user is admin
 			const [user] = await db
 				.select()
@@ -271,32 +284,284 @@ const app = new Elysia()
 				};
 			}
 
+			// Create the game with new fields
 			const [newGame] = await db
 				.insert(gamesTable)
-				.values({ status: "waiting" })
+				.values({
+					status: "waiting",
+					startDate: new Date(body.startDate),
+					yearDurations: body.yearDurations,
+				})
 				.returning();
+
+			// Create country states for all countries
+			const countryStates = [];
+			for (const countryName of COUNTRIES) {
+				const countryConfig = body.countries[countryName];
+				const [countryState] = await db
+					.insert(countryStateTable)
+					.values({
+						name: countryName,
+						gameId: newGame.id,
+						players: countryConfig.players,
+						oil: countryConfig.oil,
+						steel: countryConfig.steel,
+						population: countryConfig.population,
+						createdAt: new Date(),
+						updatedAt: new Date(),
+					})
+					.returning();
+
+				// Log initial resource values
+				const resources = ["oil", "steel", "population"] as const;
+				for (const resourceType of resources) {
+					if (countryConfig[resourceType] > 0) {
+						await db.insert(resourceChangeLogTable).values({
+							countryStateId: countryState.id,
+							gameId: newGame.id,
+							resourceType,
+							previousValue: 0,
+							newValue: countryConfig[resourceType],
+							note: "Initial game setup",
+							changedBy: query.authorization,
+							createdAt: new Date(),
+						});
+					}
+				}
+
+				countryStates.push({
+					id: countryState.id,
+					name: countryState.name as Country,
+					gameId: countryState.gameId,
+					players: countryState.players || [],
+					oil: countryState.oil,
+					steel: countryState.steel,
+					population: countryState.population,
+					createdAt: countryState.createdAt,
+					updatedAt: countryState.updatedAt,
+				});
+			}
 
 			return {
 				error: false as const,
 				game: {
 					id: newGame.id,
 					status: newGame.status as GameStatus,
-					startTime: newGame.startTime,
+					startDate: newGame.startDate,
+					yearDurations: newGame.yearDurations as YearDurations,
 					createdAt: newGame.createdAt,
 				},
+				countries: countryStates,
 			};
 		},
 		{
+			body: CreateGameBodySchema,
 			response: t.Union([
 				t.Object({
 					error: t.Literal(false),
 					game: GameSchema,
+					countries: t.Array(CountryStateSchema),
 				}),
 				ErrorSchema,
 			]),
 			detail: {
 				summary: "Create Game",
-				description: "Creates a new game (admin only).",
+				description:
+					"Creates a new game with all country configurations (admin only).",
+				tags: ["Game"],
+			},
+		},
+	)
+	.get(
+		"/game/:gameId/countries",
+		async ({ params, set }) => {
+			const gameId = Number.parseInt(params.gameId, 10);
+			const countries = await db
+				.select()
+				.from(countryStateTable)
+				.where(eq(countryStateTable.gameId, gameId));
+
+			if (countries.length === 0) {
+				set.status = 404;
+				return { error: true as const, message: "Game not found" };
+			}
+
+			return {
+				error: false as const,
+				countries: countries.map((c) => ({
+					id: c.id,
+					name: c.name as Country,
+					gameId: c.gameId,
+					players: c.players || [],
+					oil: c.oil,
+					steel: c.steel,
+					population: c.population,
+					createdAt: c.createdAt,
+					updatedAt: c.updatedAt,
+				})),
+			};
+		},
+		{
+			params: t.Object({
+				gameId: t.String(),
+			}),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					countries: t.Array(CountryStateSchema),
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Get Game Countries",
+				description: "Returns all country states for a game.",
+				tags: ["Game"],
+			},
+		},
+	)
+	.get(
+		"/game/:gameId/country/:countryId/history",
+		async ({ params }) => {
+			const countryId = Number.parseInt(params.countryId, 10);
+			const logs = await db
+				.select()
+				.from(resourceChangeLogTable)
+				.where(eq(resourceChangeLogTable.countryStateId, countryId));
+
+			if (logs.length === 0) {
+				return { error: false as const, logs: [] };
+			}
+
+			return {
+				error: false as const,
+				logs: logs.map((log) => ({
+					id: log.id,
+					countryStateId: log.countryStateId,
+					gameId: log.gameId,
+					resourceType: log.resourceType as "oil" | "steel" | "population",
+					previousValue: log.previousValue,
+					newValue: log.newValue,
+					note: log.note,
+					changedBy: log.changedBy,
+					createdAt: log.createdAt,
+				})),
+			};
+		},
+		{
+			params: t.Object({
+				gameId: t.String(),
+				countryId: t.String(),
+			}),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					logs: t.Array(ResourceChangeLogSchema),
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Get Country Resource History",
+				description: "Returns the resource change history for a country.",
+				tags: ["Game"],
+			},
+		},
+	)
+	.patch(
+		"/game/:gameId/country/:countryId/resources",
+		async ({ params, body, query, set }) => {
+			const countryId = Number.parseInt(params.countryId, 10);
+			const gameId = Number.parseInt(params.gameId, 10);
+
+			// Get current country state
+			const [country] = await db
+				.select()
+				.from(countryStateTable)
+				.where(eq(countryStateTable.id, countryId));
+
+			if (!country) {
+				set.status = 404;
+				return { error: true as const, message: "Country not found" };
+			}
+
+			// Log changes for each resource that was modified
+			const updates: Partial<{
+				oil: number;
+				steel: number;
+				population: number;
+			}> = {};
+			const resources = ["oil", "steel", "population"] as const;
+
+			for (const resourceType of resources) {
+				if (
+					body[resourceType] !== undefined &&
+					body[resourceType] !== country[resourceType]
+				) {
+					// Log the change
+					await db.insert(resourceChangeLogTable).values({
+						countryStateId: countryId,
+						gameId,
+						resourceType,
+						previousValue: country[resourceType],
+						newValue: body[resourceType],
+						note: body.note,
+						changedBy: query.authorization,
+						createdAt: new Date(),
+					});
+					updates[resourceType] = body[resourceType];
+				}
+			}
+
+			// Update the country state
+			if (Object.keys(updates).length > 0) {
+				await db
+					.update(countryStateTable)
+					.set({ ...updates, updatedAt: new Date() })
+					.where(eq(countryStateTable.id, countryId));
+			}
+
+			// Get updated country
+			const [updatedCountry] = await db
+				.select()
+				.from(countryStateTable)
+				.where(eq(countryStateTable.id, countryId));
+
+			return {
+				error: false as const,
+				country: {
+					id: updatedCountry.id,
+					name: updatedCountry.name as Country,
+					gameId: updatedCountry.gameId,
+					players: updatedCountry.players || [],
+					oil: updatedCountry.oil,
+					steel: updatedCountry.steel,
+					population: updatedCountry.population,
+					createdAt: updatedCountry.createdAt,
+					updatedAt: updatedCountry.updatedAt,
+				},
+			};
+		},
+		{
+			params: t.Object({
+				gameId: t.String(),
+				countryId: t.String(),
+			}),
+			body: t.Object({
+				oil: t.Optional(t.Number()),
+				steel: t.Optional(t.Number()),
+				population: t.Optional(t.Number()),
+				note: t.String(),
+			}),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					country: CountryStateSchema,
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Update Country Resources",
+				description:
+					"Updates country resources and logs the change with a note.",
 				tags: ["Game"],
 			},
 		},

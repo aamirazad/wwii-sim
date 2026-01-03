@@ -13,6 +13,18 @@ export const GAME_STATUSES = [
 ] as const;
 export type GameStatus = (typeof GAME_STATUSES)[number];
 
+export const COUNTRIES = [
+	"Commonwealth",
+	"France",
+	"Germany",
+	"Italy",
+	"Japan",
+	"Russia",
+	"UK",
+	"USA",
+] as const;
+export type Country = (typeof COUNTRIES)[number];
+
 export const usersTable = t.sqliteTable("users", {
 	id: t
 		.text("id")
@@ -34,7 +46,11 @@ export const gamesTable = t.sqliteTable("games", {
 		.text("status")
 		.$type<"waiting" | "active" | "paused" | "finished">()
 		.default("waiting"),
-	startTime: t.integer("start_time", { mode: "timestamp" }),
+	startDate: t.integer("start_date", { mode: "timestamp" }).notNull(),
+	// Year durations stored as JSON: { "1938": minutes, "1939": minutes, ... }
+	yearDurations: t
+		.text("year_durations", { mode: "json" })
+		.$type<Record<string, number>>(),
 	createdAt: t
 		.integer("created_at", { mode: "timestamp" })
 		.default(new Date())
@@ -44,7 +60,7 @@ export const gamesTable = t.sqliteTable("games", {
 export const gameStateTable = t.sqliteTable("game_state", {
 	id: t.int().primaryKey({ autoIncrement: true }),
 	gameId: t
-		.text("game_id")
+		.int("game_id")
 		.notNull()
 		.references(() => gamesTable.id),
 	data: t.text("data", { mode: "json" }),
@@ -56,17 +72,65 @@ export const gameStateTable = t.sqliteTable("game_state", {
 
 export const countryStateTable = t.sqliteTable("country_state", {
 	id: t.int().primaryKey({ autoIncrement: true }),
-	name: t.text("name").notNull(),
+	name: t.text("name").$type<Country>().notNull(),
 	gameId: t
-		.text("game_id")
+		.int("game_id")
 		.notNull()
 		.references(() => gamesTable.id),
+	// Array of user IDs stored as JSON
+	players: t.text("players", { mode: "json" }).$type<string[]>().default([]),
+	// Resources
+	oil: t.int("oil").default(0).notNull(),
+	steel: t.int("steel").default(0).notNull(),
+	population: t.int("population").default(0).notNull(),
+	createdAt: t
+		.integer("created_at", { mode: "timestamp" })
+		.default(new Date())
+		.notNull(),
+	updatedAt: t
+		.integer("updated_at", { mode: "timestamp" })
+		.default(new Date())
+		.notNull(),
+});
+
+// Resource change log for revision history
+export const resourceChangeLogTable = t.sqliteTable("resource_change_log", {
+	id: t.int().primaryKey({ autoIncrement: true }),
+	countryStateId: t
+		.int("country_state_id")
+		.notNull()
+		.references(() => countryStateTable.id),
+	gameId: t
+		.int("game_id")
+		.notNull()
+		.references(() => gamesTable.id),
+	// Which resource changed
+	resourceType: t
+		.text("resource_type")
+		.$type<"oil" | "steel" | "population">()
+		.notNull(),
+	// Change values
+	previousValue: t.int("previous_value").notNull(),
+	newValue: t.int("new_value").notNull(),
+	// Note describing why the change was made
+	note: t.text("note").notNull(),
+	// Who made the change
+	changedBy: t
+		.text("changed_by")
+		.notNull()
+		.references(() => usersTable.id),
+	createdAt: t
+		.integer("created_at", { mode: "timestamp" })
+		.default(new Date())
+		.notNull(),
 });
 
 export const table = {
 	usersTable,
 	gamesTable,
 	gameStateTable,
+	countryStateTable,
+	resourceChangeLogTable,
 } as const;
 
 export type Table = typeof table;
