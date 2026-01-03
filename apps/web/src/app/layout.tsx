@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Nunito_Sans } from "next/font/google";
-import Background from "@/components/Background";
-import ExternalLink from "@/components/ExternalLink";
+import Background from "@/components/background";
+import ExternalLink from "@/components/external-link";
 import "./globals.css";
+import Script from "next/script";
 import { Providers } from "./providers";
 
 const nunitoSans = Nunito_Sans({ variable: "--font-nunito" });
@@ -29,6 +30,12 @@ export default function RootLayout({
 			<body
 				className={`${geistMono.variable} ${nunitoSans.variable} dark antialiased flex flex-col min-h-screen`}
 			>
+				<Script
+					src="https://analytics.aamirazad.com/api/script.js"
+					data-site-id="e7360f70ea78"
+					strategy="lazyOnload"
+					defer
+				></Script>
 				<Providers>
 					<Background>
 						<main className="grow flex flex-col">{children}</main>

@@ -1,4 +1,4 @@
-import PixelBlast from "@/components/PixelBlast";
+import PixelBlast from "@/components/pixel-blast";
 
 export default async function Background({
 	children,
