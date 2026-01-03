@@ -3,6 +3,7 @@
 <details>
 <summary>All commits</summary>
 
+- **Feature**: create games ([#39](https://github.com/aamirazad/wwii-sim/pull/39)) by [@aamirazad](https://github.com/aamirazad) - [`89bd382...8faf464`](https://github.com/aamirazad/wwii-sim/compare/89bd382...8faf464)
 - **Feature**(web): basic apps switcher ([#37](https://github.com/aamirazad/wwii-sim/pull/37)) by [@aamirazad](https://github.com/aamirazad) - [`73339af...f91c0e7`](https://github.com/aamirazad/wwii-sim/compare/73339af...f91c0e7)
 - **Feature**: user login ([#36](https://github.com/aamirazad/wwii-sim/pull/36)) by [@aamirazad](https://github.com/aamirazad) - [`daa0bce...71f8001`](https://github.com/aamirazad/wwii-sim/compare/daa0bce...71f8001)
 - **Feature**(web): content on landing page ([#35](https://github.com/aamirazad/wwii-sim/pull/35)) by [@aamirazad](https://github.com/aamirazad) - [`1cb2295...5e1d37f`](https://github.com/aamirazad/wwii-sim/compare/1cb2295...5e1d37f)
