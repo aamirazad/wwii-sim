@@ -52,7 +52,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 			return response.data;
 		},
 		retry: 0,
-		staleTime: 30000,
+		refetchInterval: 5000, // TODO: change to use websocket to detect game start
 	});
 
 	// Query for user
