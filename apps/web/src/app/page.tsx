@@ -1,15 +1,10 @@
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import ExternalLink from "@/components/ExternalLink";
+import Link from "next/link";
+import ExternalLink from "@/components/external-link";
 
 export default async function Homepage() {
 	const cookieStore = await cookies();
 	const userId = cookieStore.get("userId");
-
-	if (userId) {
-		redirect("/game/dashboard");
-	}
-
 	return (
 		<div className="relative pointer-events-none flex flex-col items-center justify-center flex-1">
 			<div className="pointer-events-auto max-w-2/5 text-center">
@@ -23,11 +18,20 @@ export default async function Homepage() {
 						during the Second World War. The game lasts the whole day and
 						usually occurs once per marking period.
 					</p>
-					<p className="py-2 mt-5 rounded-lg bg-primary-foreground">
-						You must login to the site by clicking the link in the{" "}
-						<ExternalLink href="https://classroom.google.com/c/NzA4NjIyNTUxNDcy">
-							History Club Google Classroom
-						</ExternalLink>
+					<p className="py-2 mt-5 rounded-lg bg-primary-foreground ">
+						{!userId ? (
+							<>
+								You must login to the site by clicking the link in the{" "}
+								<ExternalLink href="https://classroom.google.com/c/NzA4NjIyNTUxNDcy">
+									History Club Google Classroom
+								</ExternalLink>
+							</>
+						) : (
+							<>
+								You are already logged in,{" "}
+								<Link href="/game/join">go to the dashboard</Link>.
+							</>
+						)}
 					</p>
 				</div>
 			</div>

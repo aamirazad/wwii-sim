@@ -3,18 +3,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
+import FullAlert from "@/components/full-alert";
+import LoadingSpinner from "@/components/loading-spinner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { api } from "@/lib/api";
+import { setCookie } from "@/lib/cookies";
 
 function App() {
 	const searchParams = useSearchParams();
 	const router = useRouter();
 	const id = searchParams.get("id");
 
-	const { data, isLoading, isError } = useQuery({
+	const { data, isLoading } = useQuery({
 		queryKey: ["user", id],
 		queryFn: async () => {
 			if (!id) throw new Error("No ID provided");
-			const response = await api["user-exist"]({ id }).get();
+			const response = await api.user({ id }).get();
 			if (response.error) throw new Error("Failed to fetch user");
 			return response.data;
 		},
@@ -23,45 +27,32 @@ function App() {
 	});
 
 	useEffect(() => {
-		if (data?.type === "server.userExist" && !isError && !isLoading) {
-			if (id) {
-				cookieStore.set({
-					name: "userId",
-					value: id,
-					expires: Date.now() + 31536000000,
-				});
-			}
-			router.push("/game/dashboard");
+		if (data && !data.error && data.user.id) {
+			setCookie("userId", data.user.id);
+			router.push("/game/play");
 		}
-	}, [data, isError, isLoading, router, id]);
+	}, [data, router]);
 
 	if (isLoading) {
+		return <LoadingSpinner />;
+	}
+
+	if (!data || data.error) {
 		return (
-			<div className="relative pointer-events-none flex flex-col items-center justify-center flex-1 ">
-				<div className="pointer-events-auto text-center">
-					<h1 className="text-3xl font-bold">Logging you in...</h1>
-				</div>
-			</div>
+			<FullAlert>
+				<Alert variant="destructive">
+					<AlertTitle>
+						There was an error logging you in. Check your link.
+					</AlertTitle>
+					<AlertDescription>
+						Maybe the server is off right now?
+					</AlertDescription>
+				</Alert>
+			</FullAlert>
 		);
 	}
 
-	if (data?.type !== "server.userExist" || isError) {
-		return (
-			<div className="relative pointer-events-none flex flex-col items-center justify-center flex-1 ">
-				<div className="pointer-events-auto text-center">
-					<h1 className="text-3xl font-bold">Your link was invalid</h1>
-				</div>
-			</div>
-		);
-	}
-
-	return (
-		<div className="relative pointer-events-none flex flex-col items-center justify-center flex-1 ">
-			<div className="pointer-events-auto text-center">
-				<h1 className="text-3xl font-bold">Welcome, {data.name}!</h1>
-			</div>
-		</div>
-	);
+	return <LoadingSpinner />;
 }
 
 export default function LoginPage() {

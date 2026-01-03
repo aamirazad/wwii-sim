@@ -60,3 +60,48 @@ export const ClientMessageSchema = t.Union([
 ]);
 
 export type ClientMessage = Static<typeof ClientMessageSchema>;
+
+// API
+
+export const UserRoleSchema = t.Union([
+	t.Literal("admin"),
+	t.Literal("player"),
+	t.Literal("spectator"),
+]);
+
+export type UserRole = Static<typeof UserRoleSchema>;
+
+export const GameStatusSchema = t.Union([
+	t.Literal("waiting"),
+	t.Literal("active"),
+	t.Literal("paused"),
+	t.Literal("finished"),
+]);
+
+export type GameStatus = Static<typeof GameStatusSchema>;
+
+export const UserSchema = t.Object({
+	id: t.String(),
+	username: t.String(),
+	name: t.String(),
+	role: UserRoleSchema,
+	createdAt: t.Date(),
+});
+
+export type User = Static<typeof UserSchema>;
+
+export const GameSchema = t.Object({
+	id: t.Number(),
+	status: GameStatusSchema,
+	startTime: t.Nullable(t.Date()),
+	createdAt: t.Date(),
+});
+
+export type Game = Static<typeof GameSchema>;
+
+export const ErrorSchema = t.Object({
+	error: t.Literal(true),
+	message: t.String(),
+});
+
+export type Error = Static<typeof ErrorSchema>;
