@@ -3,6 +3,7 @@
 <details>
 <summary>All commits</summary>
 
+- **Feature**: basic country dashboard ([#40](https://github.com/aamirazad/wwii-sim/pull/40)) by [@aamirazad](https://github.com/aamirazad) - [`73151f4...d581feb`](https://github.com/aamirazad/wwii-sim/compare/73151f4...d581feb)
 - **Feature**: create games ([#39](https://github.com/aamirazad/wwii-sim/pull/39)) by [@aamirazad](https://github.com/aamirazad) - [`89bd382...8faf464`](https://github.com/aamirazad/wwii-sim/compare/89bd382...8faf464)
 - **Feature**(web): basic apps switcher ([#37](https://github.com/aamirazad/wwii-sim/pull/37)) by [@aamirazad](https://github.com/aamirazad) - [`73339af...f91c0e7`](https://github.com/aamirazad/wwii-sim/compare/73339af...f91c0e7)
 - **Feature**: user login ([#36](https://github.com/aamirazad/wwii-sim/pull/36)) by [@aamirazad](https://github.com/aamirazad) - [`daa0bce...71f8001`](https://github.com/aamirazad/wwii-sim/compare/daa0bce...71f8001)
