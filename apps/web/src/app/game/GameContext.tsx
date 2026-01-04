@@ -1,8 +1,24 @@
 "use client";
 
-import type { Game, User } from "@api/schema";
+import type {
+	ClientMessage,
+	Country,
+	CountryResources,
+	Game,
+	ServerMessage,
+	User,
+} from "@api/schema";
 import { useQuery } from "@tanstack/react-query";
-import { createContext, type ReactNode, useContext } from "react";
+import {
+	createContext,
+	type ReactNode,
+	useCallback,
+	useContext,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
+import useWebSocket, { ReadyState } from "react-use-websocket";
 import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
 
@@ -18,9 +34,19 @@ type UserState =
 	| { status: "unauthenticated" }
 	| { status: "authenticated"; user: User };
 
+type ConnectionStatus = "connecting" | "connected" | "disconnected";
+
+type MessageHandler = (message: ServerMessage) => void;
+
 interface GameContextType {
 	gameState: GameState;
 	userState: UserState;
+	connectionStatus: ConnectionStatus;
+	subscribedCountry: Country | null;
+	countryResources: CountryResources | null;
+	subscribeToMessage: (type: string, handler: MessageHandler) => () => void;
+	sendMessage: (message: ClientMessage) => void;
+	subscribeToCountry: () => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -35,6 +61,111 @@ export function useGame() {
 
 export function GameProvider({ children }: { children: ReactNode }) {
 	const userId = getUserId();
+	const messageHandlers = useRef<Map<string, Set<MessageHandler>>>(new Map());
+	const [subscribedCountry, setSubscribedCountry] = useState<Country | null>(
+		null,
+	);
+	const [countryResources, setCountryResources] =
+		useState<CountryResources | null>(null);
+
+	const wsUrl = process.env.NEXT_PUBLIC_API_WS_URL || "ws://localhost:3001/ws";
+
+	const { sendJsonMessage, lastJsonMessage, readyState } =
+		useWebSocket<ServerMessage>(
+			userId ? `${wsUrl}?authorization=${userId}` : null,
+			{
+				shouldReconnect: () => true,
+				reconnectAttempts: 10,
+				reconnectInterval: (attemptNumber) =>
+					Math.min(1000 * 2 ** attemptNumber, 30000),
+				share: true,
+			},
+		);
+
+	// Convert readyState to connection status
+	const connectionStatus: ConnectionStatus =
+		readyState === ReadyState.OPEN
+			? "connected"
+			: readyState === ReadyState.CONNECTING
+				? "connecting"
+				: "disconnected";
+
+	// Handle incoming messages
+	useEffect(() => {
+		if (!lastJsonMessage) return;
+
+		const message = lastJsonMessage;
+		console.log("WebSocket message received:", message);
+
+		// Handle country subscription confirmation
+		if (message.type === "server.country.subscribed") {
+			setSubscribedCountry(message.country);
+		}
+
+		// Handle country resource updates
+		if (message.type === "server.country.resources") {
+			setCountryResources(message.resources);
+		}
+
+		// Call all handlers subscribed to this message type
+		const handlers = messageHandlers.current.get(message.type);
+		if (handlers) {
+			for (const handler of handlers) {
+				handler(message);
+			}
+		}
+
+		// Also call handlers subscribed to all messages
+		const allHandlers = messageHandlers.current.get("*");
+		if (allHandlers) {
+			for (const handler of allHandlers) {
+				handler(message);
+			}
+		}
+	}, [lastJsonMessage]);
+
+	// Function to subscribe to specific message types
+	const subscribeToMessage = useCallback(
+		(type: string, handler: MessageHandler) => {
+			if (!messageHandlers.current.has(type)) {
+				messageHandlers.current.set(type, new Set());
+			}
+			messageHandlers.current.get(type)?.add(handler);
+
+			// Return unsubscribe function
+			return () => {
+				messageHandlers.current.get(type)?.delete(handler);
+				if (messageHandlers.current.get(type)?.size === 0) {
+					messageHandlers.current.delete(type);
+				}
+			};
+		},
+		[],
+	);
+
+	const sendMessage = useCallback(
+		(message: ClientMessage) => {
+			if (readyState === ReadyState.OPEN) {
+				sendJsonMessage(message);
+			} else {
+				console.error(
+					"WebSocket is not open. Unable to send message:",
+					message,
+				);
+			}
+		},
+		[readyState, sendJsonMessage],
+	);
+
+	// Function to subscribe to user's country
+	const subscribeToCountry = useCallback(() => {
+		if (readyState === ReadyState.OPEN && userId) {
+			sendJsonMessage({
+				type: "client.country.subscribe",
+				token: userId,
+			});
+		}
+	}, [readyState, userId, sendJsonMessage]);
 
 	// Query for current game
 	const {
@@ -52,7 +183,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
 			return response.data;
 		},
 		retry: 0,
-		refetchInterval: 5000, // TODO: change to use websocket to detect game start
 	});
 
 	// Query for user
@@ -70,7 +200,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
 		},
 		enabled: !!userId,
 		retry: 0,
-		staleTime: 60000,
 	});
 
 	const gameState: GameState = (() => {
@@ -95,6 +224,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
 			value={{
 				gameState,
 				userState,
+				connectionStatus,
+				subscribedCountry,
+				countryResources,
+				subscribeToMessage,
+				sendMessage,
+				subscribeToCountry,
 			}}
 		>
 			{children}
