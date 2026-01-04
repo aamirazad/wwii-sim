@@ -3,6 +3,7 @@
 <details>
 <summary>All commits</summary>
 
+- **Feature**: styled date picker on create page ([#41](https://github.com/aamirazad/wwii-sim/pull/41)) by [@aamirazad](https://github.com/aamirazad) - [`1728cb8...3f1ede1`](https://github.com/aamirazad/wwii-sim/compare/1728cb8...3f1ede1)
 - **Feature**: basic country dashboard ([#40](https://github.com/aamirazad/wwii-sim/pull/40)) by [@aamirazad](https://github.com/aamirazad) - [`73151f4...d581feb`](https://github.com/aamirazad/wwii-sim/compare/73151f4...d581feb)
 - **Feature**: create games ([#39](https://github.com/aamirazad/wwii-sim/pull/39)) by [@aamirazad](https://github.com/aamirazad) - [`89bd382...8faf464`](https://github.com/aamirazad/wwii-sim/compare/89bd382...8faf464)
 - **Feature**(web): basic apps switcher ([#37](https://github.com/aamirazad/wwii-sim/pull/37)) by [@aamirazad](https://github.com/aamirazad) - [`73339af...f91c0e7`](https://github.com/aamirazad/wwii-sim/compare/73339af...f91c0e7)
