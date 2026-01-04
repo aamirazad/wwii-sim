@@ -13,3 +13,7 @@ More information will be available at https://sim.aamirazad.com.
 The project is built with [bun](https://bun.sh/).
 
 To run a local dev environment, first, run `mv .env.example .env` and fill in the values in the `.env` file. Then, run `bun install && bun dev` to run a local version of the website.
+
+## License
+
+All rights reserved. This software is not licensed for distribution, modification, or commercial use without explicit written permission from the author.
