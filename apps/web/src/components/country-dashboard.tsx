@@ -1,21 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Dices, Pickaxe, Swords } from "lucide-react";
+import { useEffect } from "react";
 import { useGame } from "@/app/game/GameContext";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Dock from "@/components/dock";
 
-export default function CountryDashboard() {
-	const {
-		userState,
-		connectionStatus,
-		subscribedCountry,
-		countryResources,
-		subscribeToCountry,
-	} = useGame();
-	const [activeTab, setActiveTab] = useState<
-		"resources" | "troops" | "research" | "info"
-	>("resources");
+interface CountryDashboardProps {
+	tab: string;
+	children?: React.ReactNode;
+}
+
+export default function CountryDashboard({
+	children,
+	tab,
+}: CountryDashboardProps) {
+	const { userState, connectionStatus, subscribedCountry, subscribeToCountry } =
+		useGame();
+	const time = new Date();
 
 	// Subscribe to country when connected and user has a country
 	useEffect(() => {
@@ -31,6 +32,8 @@ export default function CountryDashboard() {
 
 	const country =
 		userState.status === "authenticated" ? userState.user.country : null;
+	const userName =
+		userState.status === "authenticated" ? userState.user.name : null;
 
 	if (!country) {
 		return (
@@ -49,84 +52,87 @@ export default function CountryDashboard() {
 				? "bg-yellow-500"
 				: "bg-red-500";
 
+	const gameYear = 1942; // Placeholder
+
+	const dockItems = [
+		{
+			icon: <Pickaxe size={24} />,
+			label: "Resources",
+			href: "/game/resources",
+		},
+		{
+			icon: <Swords size={24} />,
+			label: "Battles",
+			href: "/game/battles",
+		},
+		{
+			icon: <Dices size={24} />,
+			label: "Game",
+			href: "/game/info",
+		},
+	];
+
 	return (
-		<div className="space-y-6 p-6 z-10">
-			<div className="flex justify-between items-center">
-				<h2 className="text-2xl font-bold">{country} Dashboard</h2>
-				<div className="flex items-center gap-2">
-					<span
-						className={`h-3 w-3 rounded-full ${connectionDotColor}`}
-						title={
-							connectionStatus === "connected"
-								? "Connected"
-								: connectionStatus === "connecting"
-									? "Connecting..."
-									: "Disconnected"
-						}
-					/>
-					{subscribedCountry && (
-						<span className="text-sm text-muted-foreground">
-							Subscribed to {subscribedCountry}
-						</span>
-					)}
+		<div className="flex flex-col grow relative">
+			{/* Top Bar */}
+			<header className="w-full pt-6 px-8 pb-2 flex justify-between items-start">
+				<div className="flex flex-col">
+					<h1 className="text-5xl font-black tracking-tighter uppercase text-white leading-none">
+						{country}
+					</h1>
+					<div className="flex items-center gap-2 mt-2">
+						<div className="h-0.5 w-10 bg-primary" />
+						<p className="text-sm font-bold tracking-[0.3em] text-zinc-400 uppercase">
+							{tab}
+						</p>
+					</div>
 				</div>
+
+				<div className="flex gap-4">
+					<p className="text-lg font-medium text-zinc-400 border rounded-xl px-2 h-fit mt-2">
+						{userName}
+					</p>
+					<div className="flex flex-col">
+						<p className="text-5xl font-mono font-bold text-white drop-shadow-lg">
+							{gameYear}
+						</p>
+						<div className="flex items-center gap-2">
+							<p className="text-lg font-medium text-zinc-400 font-mono">
+								{time.toLocaleTimeString([], {
+									hour: "2-digit",
+									minute: "2-digit",
+								})}
+							</p>
+							<div
+								className={`h-2 w-2 rounded-full ${connectionDotColor}`}
+								title={
+									connectionStatus === "connected"
+										? "Connected"
+										: connectionStatus === "connecting"
+											? "Connecting..."
+											: "Disconnected"
+								}
+							/>
+						</div>
+					</div>
+				</div>
+			</header>
+
+			{/* Main Content Island */}
+			<div className="mx-6 grow flex bg-zinc-900/50 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl overflow-hidden relative">
+				{/* Inner Content */}
+				<div className="p-8 h-full overflow-auto w-full">{children}</div>
 			</div>
 
-			<div className="flex space-x-2">
-				<Button
-					variant={activeTab === "resources" ? "default" : "outline"}
-					onClick={() => setActiveTab("resources")}
-				>
-					Resources
-				</Button>
-				<Button
-					variant={activeTab === "troops" ? "default" : "outline"}
-					disabled
-					title="Not available yet"
-				>
-					Troops
-				</Button>
-				<Button
-					variant={activeTab === "research" ? "default" : "outline"}
-					disabled
-					title="Not available yet"
-				>
-					Research
-				</Button>
-				<Button
-					variant={activeTab === "info" ? "default" : "outline"}
-					disabled
-					title="Not available yet"
-				>
-					Game Info
-				</Button>
+			{/* Dock */}
+			<div className="">
+				<Dock
+					items={dockItems}
+					panelHeight={68}
+					baseItemSize={50}
+					magnification={70}
+				/>
 			</div>
-
-			{activeTab === "resources" && (
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-					<ResourceCard name="Oil" value={countryResources?.oil ?? 0} />
-					<ResourceCard name="Steel" value={countryResources?.steel ?? 0} />
-					<ResourceCard
-						name="Population"
-						value={countryResources?.population ?? 0}
-					/>
-				</div>
-			)}
 		</div>
-	);
-}
-
-function ResourceCard({ name, value }: { name: string; value: number }) {
-	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>{name}</CardTitle>
-			</CardHeader>
-			<CardContent>
-				<div className="flex flex-col space-y-2">
-					<div className="text-3xl font-bold">{value.toLocaleString()}</div>
-				</div>
-			</CardContent>
-		</Card>
 	);
 }
