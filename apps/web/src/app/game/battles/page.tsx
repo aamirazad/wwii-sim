@@ -1,3 +1,5 @@
+import CountryDashboard from "@/components/country-dashboard";
+
 export default function GameBattles() {
-	return <div>Battles</div>;
+	return <CountryDashboard tab="Battles">Battles</CountryDashboard>;
 }
