@@ -433,15 +433,12 @@ const app = new Elysia()
 				};
 			}
 
-			const tigerStartDate = new Date(body.startDate);
-			// The bell rings 15 seconds after the minute passes, this lines up with that
-			tigerStartDate.setSeconds(15);
 			// Create the game with new fields
 			const [newGame] = await db
 				.insert(gamesTable)
 				.values({
 					status: "waiting",
-					startDate: tigerStartDate,
+					startDate: new Date(body.startDate),
 					yearDurations: body.yearDurations,
 				})
 				.returning();
