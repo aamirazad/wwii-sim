@@ -34,6 +34,7 @@ export const usersTable = t.sqliteTable("users", {
 	name: t.text("name").notNull(),
 	email: t.text("email").notNull(),
 	role: t.text("role").$type<UserRole>().notNull(),
+	country: t.text("country").$type<Country>(),
 	createdAt: t
 		.integer("created_at", { mode: "timestamp" })
 		.default(new Date())
@@ -77,8 +78,6 @@ export const countryStateTable = t.sqliteTable("country_state", {
 		.int("game_id")
 		.notNull()
 		.references(() => gamesTable.id),
-	// Array of user IDs stored as JSON
-	players: t.text("players", { mode: "json" }).$type<string[]>().default([]),
 	// Resources
 	oil: t.int("oil").default(0).notNull(),
 	steel: t.int("steel").default(0).notNull(),

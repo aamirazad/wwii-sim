@@ -1,6 +1,6 @@
 import { cors } from "@elysiajs/cors";
 import { fromTypes, openapi } from "@elysiajs/openapi";
-import { eq, or } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import packageJson from "../package.json";
 import { db } from "./db";
@@ -15,11 +15,14 @@ import {
 	usersTable,
 } from "./db/schema";
 import {
+	ClientMessageSchema,
+	CountrySchema,
 	CountryStateSchema,
 	CreateGameBodySchema,
 	ErrorSchema,
 	GameSchema,
 	ResourceChangeLogSchema,
+	ServerMessageSchema,
 	UserRoleSchema,
 	UserSchema,
 	type YearDurations,
@@ -70,14 +73,21 @@ const app = new Elysia()
 				return { error: true as const, message: "User not found" };
 			}
 
+			const baseUser = {
+				id: user.id,
+				username: user.username,
+				name: user.name,
+				role: user.role as UserRole,
+			};
+
+			const userResponse =
+				user.country != null
+					? { ...baseUser, country: user.country as Country }
+					: baseUser;
+
 			return {
 				error: false as const,
-				user: {
-					id: user.id,
-					username: user.username,
-					name: user.name,
-					role: user.role as UserRole,
-				},
+				user: userResponse,
 			};
 		},
 		{
@@ -98,36 +108,108 @@ const app = new Elysia()
 			},
 		},
 	)
-	// // Websocket
-	// .ws("/ws", {
-	// 	body: schema.ClientMessageSchema,
-	// 	response: schema.ServerMessageSchema,
-	// 	open(ws) {
-	// 		console.log(`User Connected`);
-	// 		ws.send({
-	// 			type: "server.connected",
-	// 			apiVersion: packageJson.version,
-	// 		});
-	// 	},
-	// 	async message(ws, message) {
-	// 		const [authenticatedUser] = await db
-	// 			.select()
-	// 			.from(usersTable)
-	// 			.where((table) => eq(table.id, message.token));
+	// Websocket
+	.ws("/ws", {
+		body: ClientMessageSchema,
+		response: ServerMessageSchema,
+		open(ws) {
+			console.log(`User Connected`);
+			ws.send({
+				type: "server.connected",
+				apiVersion: packageJson.version,
+			});
+			ws.subscribe("global");
+		},
+		async message(ws, message) {
+			const [authenticatedUser] = await db
+				.select()
+				.from(usersTable)
+				.where((table) => eq(table.id, message.token));
 
-	// 		if (!authenticatedUser) {
-	// 			ws.send({
-	// 				type: "server.error",
-	// 				message: "Missing or invalid Authorization header",
-	// 			});
-	// 			return;
-	// 		}
-	// 		console.log("extra");
-	// 	},
-	// 	close(ws) {
-	// 		ws.unsubscribe("global");
-	// 	},
-	// })
+			if (!authenticatedUser) {
+				ws.send({
+					type: "server.error",
+					message: "Missing or invalid Authorization header",
+				});
+				return;
+			}
+
+			switch (message.type) {
+				case "client.game.start":
+					await db
+						.update(gamesTable)
+						.set({ status: "active" })
+						.where(eq(gamesTable.id, message.gameId));
+					ws.send({
+						type: "server.game.started",
+					});
+					ws.publish("global", {
+						type: "server.game.started",
+					});
+					break;
+
+				case "client.country.subscribe": {
+					const userCountry = authenticatedUser.country as Country | null;
+					if (!userCountry) {
+						ws.send({
+							type: "server.error",
+							message: "User is not assigned to a country",
+						});
+						return;
+					}
+
+					// Subscribe to country-specific room
+					ws.subscribe(`country:${userCountry}`);
+
+					// Get current country resources from the active game
+					const [game] = await db
+						.select()
+						.from(gamesTable)
+						.where(
+							or(
+								eq(gamesTable.status, "active"),
+								eq(gamesTable.status, "waiting"),
+								eq(gamesTable.status, "paused"),
+							),
+						)
+						.limit(1);
+
+					if (game) {
+						const [countryState] = await db
+							.select()
+							.from(countryStateTable)
+							.where(
+								and(
+									eq(countryStateTable.gameId, game.id),
+									eq(countryStateTable.name, userCountry),
+								),
+							);
+
+						if (countryState) {
+							ws.send({
+								type: "server.country.resources",
+								country: userCountry,
+								resources: {
+									oil: countryState.oil,
+									steel: countryState.steel,
+									population: countryState.population,
+								},
+							});
+						}
+					}
+
+					ws.send({
+						type: "server.country.subscribed",
+						country: userCountry,
+					});
+					break;
+				}
+			}
+		},
+		close(ws) {
+			ws.unsubscribe("global");
+		},
+	})
 	// Protected routes
 	.guard({
 		query: t.Object({
@@ -156,14 +238,20 @@ const app = new Elysia()
 		"/users",
 		async () => {
 			const users = await db.select().from(usersTable);
-			return users.map((user) => ({
-				id: user.id,
-				username: user.username,
-				name: user.name,
-				email: user.email,
-				role: user.role as UserRole,
-				createdAt: user.createdAt,
-			}));
+			return users.map((user) => {
+				const base = {
+					id: user.id,
+					username: user.username,
+					name: user.name,
+					email: user.email,
+					role: user.role as UserRole,
+					createdAt: user.createdAt,
+				};
+
+				return user.country != null
+					? { ...base, country: user.country as Country }
+					: base;
+			});
 		},
 		{
 			response: t.Array(UserSchema),
@@ -246,6 +334,67 @@ const app = new Elysia()
 			},
 		},
 	)
+	.patch(
+		"/user/:id/country",
+		async ({ params, body, query, set }) => {
+			// Check if requester is admin
+			const [requester] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+
+			if (requester.role !== "admin") {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only admins can assign countries",
+				};
+			}
+
+			// Update user's country
+			const [updatedUser] = await db
+				.update(usersTable)
+				.set({ country: body.country })
+				.where(eq(usersTable.id, params.id))
+				.returning();
+
+			if (!updatedUser) {
+				set.status = 404;
+				return { error: true as const, message: "User not found" };
+			}
+
+			return {
+				error: false as const,
+				user: {
+					id: updatedUser.id,
+					username: updatedUser.username,
+					name: updatedUser.name,
+					role: updatedUser.role as UserRole,
+					country: updatedUser.country as Country | undefined,
+				},
+			};
+		},
+		{
+			params: t.Object({
+				id: t.String(),
+			}),
+			body: t.Object({
+				country: t.Optional(CountrySchema),
+			}),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					user: UserSchema,
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Assign Country to User",
+				description: "Assigns a country to a user (admin only).",
+				tags: ["User"],
+			},
+		},
+	)
 	.post(
 		"/game/create",
 		async ({ query, body, set }) => {
@@ -284,12 +433,15 @@ const app = new Elysia()
 				};
 			}
 
+			const tigerStartDate = new Date(body.startDate);
+			// The bell rings 15 seconds after the minute passes, this lines up with that
+			tigerStartDate.setSeconds(15);
 			// Create the game with new fields
 			const [newGame] = await db
 				.insert(gamesTable)
 				.values({
 					status: "waiting",
-					startDate: new Date(body.startDate),
+					startDate: tigerStartDate,
 					yearDurations: body.yearDurations,
 				})
 				.returning();
@@ -303,7 +455,6 @@ const app = new Elysia()
 					.values({
 						name: countryName,
 						gameId: newGame.id,
-						players: countryConfig.players,
 						oil: countryConfig.oil,
 						steel: countryConfig.steel,
 						population: countryConfig.population,
@@ -333,7 +484,6 @@ const app = new Elysia()
 					id: countryState.id,
 					name: countryState.name as Country,
 					gameId: countryState.gameId,
-					players: countryState.players || [],
 					oil: countryState.oil,
 					steel: countryState.steel,
 					population: countryState.population,
@@ -392,7 +542,6 @@ const app = new Elysia()
 					id: c.id,
 					name: c.name as Country,
 					gameId: c.gameId,
-					players: c.players || [],
 					oil: c.oil,
 					steel: c.steel,
 					population: c.population,
@@ -517,6 +666,21 @@ const app = new Elysia()
 					.update(countryStateTable)
 					.set({ ...updates, updatedAt: new Date() })
 					.where(eq(countryStateTable.id, countryId));
+
+				// Broadcast resource update to country subscribers
+				const countryName = country.name as Country;
+				app.server?.publish(
+					`country:${countryName}`,
+					JSON.stringify({
+						type: "server.country.resources",
+						country: countryName,
+						resources: {
+							oil: updates.oil ?? country.oil,
+							steel: updates.steel ?? country.steel,
+							population: updates.population ?? country.population,
+						},
+					}),
+				);
 			}
 
 			// Get updated country
@@ -531,7 +695,6 @@ const app = new Elysia()
 					id: updatedCountry.id,
 					name: updatedCountry.name as Country,
 					gameId: updatedCountry.gameId,
-					players: updatedCountry.players || [],
 					oil: updatedCountry.oil,
 					steel: updatedCountry.steel,
 					population: updatedCountry.population,

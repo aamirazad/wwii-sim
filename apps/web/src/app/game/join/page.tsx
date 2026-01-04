@@ -1,7 +1,8 @@
 "use client";
 
-import type { Game } from "@api/schema";
-import { Clock, Loader2 } from "lucide-react";
+import type { ClientMessage, Game, User } from "@api/schema";
+import { Clock, Loader2, Users } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Center from "@/components/center";
@@ -62,7 +63,21 @@ function NoGameInProgress({ isAdmin }: { isAdmin: boolean }) {
 	);
 }
 
-function GameWaiting({ game }: { game: Game }) {
+interface GameWaitingProps {
+	game: Game;
+	isAdmin: boolean;
+	user: User;
+	connectionStatus: "connecting" | "connected" | "disconnected";
+	sendMessage: (message: ClientMessage) => void;
+}
+
+function GameWaiting({
+	game,
+	isAdmin,
+	connectionStatus,
+	sendMessage,
+	user,
+}: GameWaitingProps) {
 	const [timeRemaining, setTimeRemaining] = useState<{
 		days: number;
 		hours: number;
@@ -70,7 +85,13 @@ function GameWaiting({ game }: { game: Game }) {
 		seconds: number;
 	} | null>(null);
 	const [isPastStartDate, setIsPastStartDate] = useState(false);
-	const router = useRouter();
+
+	const connectionDotColor =
+		connectionStatus === "connected"
+			? "bg-green-500"
+			: connectionStatus === "connecting"
+				? "bg-yellow-500"
+				: "bg-red-500";
 
 	useEffect(() => {
 		const calculateTimeRemaining = () => {
@@ -101,26 +122,34 @@ function GameWaiting({ game }: { game: Game }) {
 		return () => clearInterval(interval);
 	}, [game.startDate]);
 
-	useEffect(() => {
-		if (game.status === "active") {
-			router.push(`/game/${game.id}`);
-		}
-	}, [game.status, router, game.id]);
-
 	return (
 		<Center>
 			<Card className="min-w-md">
 				<CardHeader>
-					<CardTitle className="text-xl text-center">
-						{isPastStartDate
-							? "Waiting for Game to Start"
-							: "Game Starting Soon"}
-					</CardTitle>
+					<div className="flex items-center justify-between">
+						<CardTitle className="text-xl">
+							{isPastStartDate
+								? "Waiting for Game to Start"
+								: "Game Starting Soon"}
+						</CardTitle>
+						<div className="flex items-center gap-2">
+							<span
+								className={`h-3 w-3 rounded-full ${connectionDotColor}`}
+								title={
+									connectionStatus === "connected"
+										? "Connected"
+										: connectionStatus === "connecting"
+											? "Connecting..."
+											: "Disconnected"
+								}
+							/>
+						</div>
+					</div>
 				</CardHeader>
-				<CardContent className="">
+				<CardContent>
 					<div className="text-center space-y-4">
 						{isPastStartDate ? (
-							<div className="flex flex-col items-center gap-4 py-2 pb-4">
+							<div className="flex flex-col items-center gap-4">
 								<p className="text-md text-muted-foreground">
 									The game should start soon!
 								</p>
@@ -131,7 +160,7 @@ function GameWaiting({ game }: { game: Game }) {
 								<div className="flex items-center justify-center gap-2 text-muted-foreground">
 									<Clock className="h-5 w-5" />
 									<p className="text-lg">
-										Game starts on{" "}
+										The game is scheduled to start on{" "}
 										{new Date(game.startDate).toLocaleDateString("en-US", {
 											weekday: "long",
 											month: "long",
@@ -140,12 +169,24 @@ function GameWaiting({ game }: { game: Game }) {
 									</p>
 								</div>
 								{timeRemaining && (
-									<div className="grid grid-cols-4 gap-4 max-w-lg mx-auto pb-4">
+									<div className="grid grid-cols-4 gap-4 max-w-lg mx-auto">
 										{[
-											{ label: "Days", value: timeRemaining.days },
-											{ label: "Hours", value: timeRemaining.hours },
-											{ label: "Minutes", value: timeRemaining.minutes },
-											{ label: "Seconds", value: timeRemaining.seconds },
+											{
+												label: `${timeRemaining.days === 1 ? "Day" : "Days"}`,
+												value: timeRemaining.days,
+											},
+											{
+												label: `${timeRemaining.hours === 1 ? "Hour" : "Hours"}`,
+												value: timeRemaining.hours,
+											},
+											{
+												label: `${timeRemaining.minutes === 1 ? "Minute" : "Minutes"}`,
+												value: timeRemaining.minutes,
+											},
+											{
+												label: `${timeRemaining.seconds === 1 ? "Second" : "Seconds"}`,
+												value: timeRemaining.seconds,
+											},
 										].map((item) => (
 											<div
 												key={item.label}
@@ -161,13 +202,38 @@ function GameWaiting({ game }: { game: Game }) {
 										))}
 									</div>
 								)}
+								{user.country && (
+									<div>You are playing as the {user.country}</div>
+								)}
 							</>
 						)}
-					</div>
-					<div className="pt-4 border-t">
-						<p className="text-center text-sm text-muted-foreground">
-							Game ID: {game.id}
-						</p>
+						{isAdmin && (
+							<div className="space-y-2">
+								<p>As an admin, you can start the game at any time.</p>
+								<div className="flex gap-2 justify-center ">
+									<Button
+										onClick={() =>
+											sendMessage({
+												type: "client.game.start",
+												gameId: game.id,
+												token: user.id,
+											})
+										}
+									>
+										Start Game
+									</Button>
+									<Link href="/admin/users">
+										<Button variant="outline">
+											<Users className="mr-2 h-4 w-4" />
+											Manage Users
+										</Button>
+									</Link>
+								</div>
+								<p className="text-center text-xs text-muted-foreground">
+									Game ID: {game.id}
+								</p>
+							</div>
+						)}
 					</div>
 				</CardContent>
 			</Card>
@@ -176,7 +242,29 @@ function GameWaiting({ game }: { game: Game }) {
 }
 
 export default function JoinGame() {
-	const { gameState, userState } = useGame();
+	const {
+		gameState,
+		userState,
+		connectionStatus,
+		subscribeToMessage,
+		sendMessage,
+	} = useGame();
+	const router = useRouter();
+
+	// Listen for game start WebSocket message
+	useEffect(() => {
+		const unsubscribe = subscribeToMessage("server.game.started", () => {
+			router.replace("/game/resources");
+		});
+
+		return unsubscribe;
+	}, [subscribeToMessage, router]);
+
+	useEffect(() => {
+		if (gameState.status === "has-game" && gameState.game.status === "active") {
+			router.replace("/game/resources");
+		}
+	}, [gameState, router]);
 
 	if (gameState.status === "loading" || userState.status === "loading") {
 		return <LoadingSpinner />;
@@ -197,6 +285,15 @@ export default function JoinGame() {
 		return <NoGameInProgress isAdmin={isAdmin} />;
 	}
 
-	const game = gameState.game;
-	return <GameWaiting game={game} />;
+	if (gameState.game.status === "waiting") {
+		return (
+			<GameWaiting
+				game={gameState.game}
+				isAdmin={isAdmin}
+				user={user}
+				connectionStatus={connectionStatus}
+				sendMessage={sendMessage}
+			/>
+		);
+	}
 }

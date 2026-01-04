@@ -26,6 +26,17 @@ export const GAME_YEARS = [
 ] as const;
 export type GameYear = (typeof GAME_YEARS)[number];
 
+export const CountrySchema = t.Union([
+	t.Literal("Commonwealth"),
+	t.Literal("France"),
+	t.Literal("Germany"),
+	t.Literal("Italy"),
+	t.Literal("Japan"),
+	t.Literal("Russia"),
+	t.Literal("UK"),
+	t.Literal("USA"),
+]);
+
 export const ServerMessageSchema = t.Union([
 	t.Object({
 		type: t.Literal("server.connected"),
@@ -54,19 +65,35 @@ export const ServerMessageSchema = t.Union([
 			createdAt: t.Date(),
 		}),
 	}),
+	t.Object({
+		type: t.Literal("server.game.started"),
+	}),
+	t.Object({
+		type: t.Literal("server.country.subscribed"),
+		country: CountrySchema,
+	}),
+	t.Object({
+		type: t.Literal("server.country.resources"),
+		country: CountrySchema,
+		resources: t.Object({
+			oil: t.Number(),
+			steel: t.Number(),
+			population: t.Number(),
+		}),
+	}),
 ]);
 
 export type ServerMessage = Static<typeof ServerMessageSchema>;
 
 export const ClientMessageSchema = t.Union([
 	t.Object({
+		type: t.Literal("client.game.start"),
+		gameId: t.Number(),
 		token: t.String(),
-		type: t.Literal("client.counter.increment"),
 	}),
 	t.Object({
+		type: t.Literal("client.country.subscribe"),
 		token: t.String(),
-		type: t.Literal("client.auth"),
-		userId: t.String(),
 	}),
 ]);
 
@@ -91,17 +118,6 @@ export const GameStatusSchema = t.Union([
 
 export type GameStatus = Static<typeof GameStatusSchema>;
 
-export const CountrySchema = t.Union([
-	t.Literal("Commonwealth"),
-	t.Literal("France"),
-	t.Literal("Germany"),
-	t.Literal("Italy"),
-	t.Literal("Japan"),
-	t.Literal("Russia"),
-	t.Literal("UK"),
-	t.Literal("USA"),
-]);
-
 export const ResourceTypeSchema = t.Union([
 	t.Literal("oil"),
 	t.Literal("steel"),
@@ -113,6 +129,7 @@ export const UserSchema = t.Object({
 	username: t.String(),
 	name: t.String(),
 	role: UserRoleSchema,
+	country: t.Optional(CountrySchema),
 });
 
 export type User = Static<typeof UserSchema>;
@@ -148,7 +165,6 @@ export const CountryResourcesSchema = t.Object({
 export type CountryResources = Static<typeof CountryResourcesSchema>;
 
 export const CountryConfigSchema = t.Object({
-	players: t.Array(t.String()),
 	oil: t.Number(),
 	steel: t.Number(),
 	population: t.Number(),
@@ -177,7 +193,6 @@ export const CountryStateSchema = t.Object({
 	id: t.Number(),
 	name: CountrySchema,
 	gameId: t.Number(),
-	players: t.Array(t.String()),
 	oil: t.Number(),
 	steel: t.Number(),
 	population: t.Number(),
