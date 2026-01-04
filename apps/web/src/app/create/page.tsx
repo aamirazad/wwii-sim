@@ -1,10 +1,13 @@
 "use client";
 
+import { ChevronDownIcon } from "lucide-react";
 import { redirect, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getUserId } from "@/app/actions";
 import Center from "@/components/center";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
 	Card,
 	CardContent,
@@ -14,8 +17,12 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import { api } from "@/lib/api";
-import { getUserId } from "@/lib/cookies";
 
 const COUNTRIES = [
 	"Commonwealth",
@@ -65,9 +72,11 @@ export default function CreateGamePage() {
 	const router = useRouter();
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [open, setOpen] = useState(false);
 
 	// Form state
-	const [startDate, setStartDate] = useState("");
+	const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+	const [startTime, setStartTime] = useState<string>("07:37:15");
 	const [yearDurations, setYearDurations] = useState<YearDurations>(() => {
 		const durations: YearDurations = {};
 		for (const year of GAME_YEARS) {
@@ -105,18 +114,23 @@ export default function CreateGamePage() {
 		setIsSubmitting(true);
 		setError(null);
 
-		const userId = getUserId();
+		const userId = await getUserId();
 		if (!userId) {
+			window.scrollTo(0, 0);
 			setError("You must be logged in to create a game");
 			setIsSubmitting(false);
 			return;
 		}
 
 		if (!startDate) {
+			window.scrollTo(0, 0);
 			setError("Please select a start date");
 			setIsSubmitting(false);
 			return;
 		}
+
+		const [hours, minutes, seconds] = startTime.split(":").map(Number);
+		startDate.setHours(hours, minutes, seconds);
 
 		try {
 			const response = await api.game.create.post(
@@ -132,6 +146,7 @@ export default function CreateGamePage() {
 
 			if (response.error) {
 				const errData = response.error as { value?: { message?: string } };
+				window.scrollTo(0, 0);
 				setError(errData.value?.message || "Failed to create game");
 				return;
 			}
@@ -144,10 +159,14 @@ export default function CreateGamePage() {
 		}
 	};
 
-	const userId = getUserId();
-	if (!userId) {
-		redirect("/login");
-	}
+	useEffect(() => {
+		(async () => {
+			const userId = await getUserId();
+			if (!userId) {
+				redirect("/");
+			}
+		})();
+	}, []);
 
 	return (
 		<Center>
@@ -170,13 +189,50 @@ export default function CreateGamePage() {
 						<CardContent className="space-y-6">
 							<div className="space-y-2">
 								<Label htmlFor="startDate">Start Date</Label>
-								<Input
-									id="startDate"
-									type="datetime-local"
-									value={startDate}
-									onChange={(e) => setStartDate(e.target.value)}
-									required
-								/>
+								<div className="flex gap-4">
+									<div className="flex flex-col gap-3">
+										<Popover open={open} onOpenChange={setOpen}>
+											<PopoverTrigger
+												render={
+													<Button
+														variant="outline"
+														id="date-picker"
+														className="w-32 justify-between font-normal"
+													>
+														{startDate
+															? startDate.toLocaleDateString()
+															: "Select date"}
+														<ChevronDownIcon />
+													</Button>
+												}
+											></PopoverTrigger>
+											<PopoverContent
+												className="w-auto overflow-hidden p-0"
+												align="start"
+											>
+												<Calendar
+													mode="single"
+													selected={startDate}
+													captionLayout="dropdown"
+													onSelect={(date) => {
+														setStartDate(date);
+														setOpen(false);
+													}}
+												/>
+											</PopoverContent>
+										</Popover>
+									</div>
+									<div className="flex flex-col gap-3">
+										<Input
+											onChange={(e) => setStartTime(e.target.value)}
+											type="time"
+											id="time-picker"
+											step="1"
+											defaultValue="07:37:15"
+											className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+										/>
+									</div>
+								</div>
 							</div>
 
 							<div className="space-y-2">
