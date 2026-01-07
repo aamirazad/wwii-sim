@@ -14,6 +14,7 @@
 	"private": true,
 	"scripts": {
 		"build": "turbo run build",
+		"api:build": "bun build --compile --minify-whitespace --minify-syntax --target bun --outfile server apps/api/src/index.ts",
 		"dev": "turbo run dev",
 		"lint": "biome check",
 		"check-types": "turbo run check-types"
