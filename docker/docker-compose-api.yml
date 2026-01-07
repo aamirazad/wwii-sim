@@ -1,0 +1,11 @@
+services:
+  api:
+    image: ghcr.io/aamirazad/wwii-sim/api:latest
+    ports:
+      - "3001:3001"
+    environment:
+      DB_FILE_NAME: /data/db.sqlite
+      CORS_ORIGIN: "http://localhost:3000"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

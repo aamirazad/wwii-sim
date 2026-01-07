@@ -6,7 +6,7 @@ The HASD History Club WWII Simulation is a fun game for students playing a count
 
 ## Learn more
 
-More information will be available at https://sim.aamirazad.com.
+More information will be available at <https://sim.aamirazad.com>.
 
 ## Development
 
