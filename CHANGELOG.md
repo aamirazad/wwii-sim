@@ -3,6 +3,7 @@
 <details>
 <summary>All commits</summary>
 
+- **Fix**(ci): build working arch docker image ([#46](https://github.com/aamirazad/wwii-sim/pull/46)) by [@aamirazad](https://github.com/aamirazad) - [`7805d70...5ce946d`](https://github.com/aamirazad/wwii-sim/compare/7805d70...5ce946d)
 - **Feature**(ci): backend docker image ([#44](https://github.com/aamirazad/wwii-sim/pull/44)) by [@aamirazad](https://github.com/aamirazad) - [`77b40bc...1f6c852`](https://github.com/aamirazad/wwii-sim/compare/77b40bc...1f6c852)
 - **Documentation**: all rights reserved ([#43](https://github.com/aamirazad/wwii-sim/pull/43)) by [@aamirazad](https://github.com/aamirazad) - [`e665b7b...77452ef`](https://github.com/aamirazad/wwii-sim/compare/e665b7b...77452ef)
 - **Fix**(api): remove auto added time offset ([#42](https://github.com/aamirazad/wwii-sim/pull/42)) by [@aamirazad](https://github.com/aamirazad) - [`a053616...9d09f2f`](https://github.com/aamirazad/wwii-sim/compare/a053616...9d09f2f)
