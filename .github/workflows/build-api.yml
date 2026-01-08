@@ -5,7 +5,7 @@ on:
     branches: ["main"]
   
 concurrency:
-  group: docker-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
  
 jobs:
@@ -46,12 +46,28 @@ jobs:
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=sha,format=long
-  
+
+      - name: Cache bun and project bun dir
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun
+            ~/.cache/bun
+            apps/api/.bun
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
       - name: Install api dependencies
         run: bun install --filter "api"
-      
-      - name: Build api
-        run: bun run api:build
+
+      - name: Build api binaries
+        run: |
+          mkdir -p server
+          bun build --compile --minify-whitespace --minify-syntax --target bun-linux-arm64 --outfile server/server-arm64 apps/api/src/index.ts
+          chmod +x server/server-arm64
+          bun build --compile --minify-whitespace --minify-syntax --target bun-linux-x64 --outfile server/server-amd64 apps/api/src/index.ts
+          chmod +x server/server-amd64
 
       - name: Build and push container image
         uses: docker/build-push-action@v6
@@ -62,3 +78,5 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           file: docker/Dockerfile-api
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
