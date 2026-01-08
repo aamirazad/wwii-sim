@@ -6,8 +6,8 @@ ARG TARGETARCH
 
 WORKDIR /app
 
-COPY ./server /app/server
-
+# Copy the architecture-specific server binary produced by the workflow
+COPY ./server/server-${TARGETARCH} /app/server
 EXPOSE 3001
 
 CMD ["/app/server"]
