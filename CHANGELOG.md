@@ -3,6 +3,7 @@
 <details>
 <summary>All commits</summary>
 
+- **Feature**(ci): backend docker image ([#44](https://github.com/aamirazad/wwii-sim/pull/44)) by [@aamirazad](https://github.com/aamirazad) - [`77b40bc...1f6c852`](https://github.com/aamirazad/wwii-sim/compare/77b40bc...1f6c852)
 - **Documentation**: all rights reserved ([#43](https://github.com/aamirazad/wwii-sim/pull/43)) by [@aamirazad](https://github.com/aamirazad) - [`e665b7b...77452ef`](https://github.com/aamirazad/wwii-sim/compare/e665b7b...77452ef)
 - **Fix**(api): remove auto added time offset ([#42](https://github.com/aamirazad/wwii-sim/pull/42)) by [@aamirazad](https://github.com/aamirazad) - [`a053616...9d09f2f`](https://github.com/aamirazad/wwii-sim/compare/a053616...9d09f2f)
 - **Feature**: styled date picker on create page ([#41](https://github.com/aamirazad/wwii-sim/pull/41)) by [@aamirazad](https://github.com/aamirazad) - [`1728cb8...3f1ede1`](https://github.com/aamirazad/wwii-sim/compare/1728cb8...3f1ede1)
