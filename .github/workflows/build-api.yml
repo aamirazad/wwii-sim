@@ -3,6 +3,10 @@ name: Build
 on:
   push:
     branches: ["main"]
+  workflow_run:
+    workflows: [Merge Bot]
+    types:
+      - completed
   
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
