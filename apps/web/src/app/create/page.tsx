@@ -1,5 +1,12 @@
 "use client";
 
+import {
+	COUNTRIES,
+	type Country,
+	DEFAULT_COUNTRY_STARTING_RESOURCES,
+	GAME_YEARS,
+	type GameYear,
+} from "@api/schema";
 import { ChevronDownIcon } from "lucide-react";
 import { redirect, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -24,30 +31,6 @@ import {
 } from "@/components/ui/popover";
 import { api } from "@/lib/api";
 
-const COUNTRIES = [
-	"Commonwealth",
-	"France",
-	"Germany",
-	"Italy",
-	"Japan",
-	"Russia",
-	"UK",
-	"USA",
-] as const;
-
-const GAME_YEARS = [
-	"1938",
-	"1939",
-	"1940",
-	"1941",
-	"1942",
-	"1943",
-	"1944",
-] as const;
-
-type Country = (typeof COUNTRIES)[number];
-type GameYear = (typeof GAME_YEARS)[number];
-
 interface CountryConfig {
 	oil: number;
 	steel: number;
@@ -59,12 +42,6 @@ type CountriesConfig = Record<Country, CountryConfig>;
 interface YearDurations {
 	[key: string]: number;
 }
-
-const DEFAULT_COUNTRY_CONFIG: CountryConfig = {
-	oil: 0,
-	steel: 0,
-	population: 0,
-};
 
 const DEFAULT_YEAR_DURATION = 46;
 
@@ -84,13 +61,9 @@ export default function CreateGamePage() {
 		}
 		return durations;
 	});
-	const [countries, setCountries] = useState<CountriesConfig>(() => {
-		const config = {} as CountriesConfig;
-		for (const country of COUNTRIES) {
-			config[country] = { ...DEFAULT_COUNTRY_CONFIG };
-		}
-		return config;
-	});
+	const [countries, setCountries] = useState<CountriesConfig>(
+		() => DEFAULT_COUNTRY_STARTING_RESOURCES as CountriesConfig,
+	);
 
 	const handleYearDurationChange = (year: GameYear, value: string) => {
 		const numValue = Number.parseInt(value, 10) || 0;
@@ -99,13 +72,16 @@ export default function CreateGamePage() {
 
 	const handleCountryResourceChange = (
 		country: Country,
-		resource: "oil" | "steel" | "population",
+		field: keyof CountryConfig,
 		value: string,
 	) => {
 		const numValue = Number.parseInt(value, 10) || 0;
 		setCountries((prev) => ({
 			...prev,
-			[country]: { ...prev[country], [resource]: numValue },
+			[country]: {
+				...prev[country],
+				[field]: numValue,
+			},
 		}));
 	};
 
@@ -265,81 +241,82 @@ export default function CreateGamePage() {
 						<CardHeader>
 							<CardTitle>Country Configurations</CardTitle>
 							<CardDescription>
-								Set initial resources for each country. Players can be assigned
-								separately after game creation.
+								Configure the starting resources for each country.
 							</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-6">
-							{COUNTRIES.map((country) => (
-								<div
-									key={country}
-									className="border-b pb-4 last:border-b-0 last:pb-0"
-								>
-									<h3 className="mb-3 font-semibold">{country}</h3>
-									<div className="grid gap-4 sm:grid-cols-3">
-										<div className="space-y-1">
-											<Label htmlFor={`${country}-oil`} className="text-xs">
-												Oil
-											</Label>
-											<Input
-												id={`${country}-oil`}
-												type="number"
-												min={0}
-												value={countries[country].oil}
-												onChange={(e) =>
-													handleCountryResourceChange(
-														country,
-														"oil",
-														e.target.value,
-													)
-												}
-												required
-											/>
-										</div>
-										<div className="space-y-1">
-											<Label htmlFor={`${country}-steel`} className="text-xs">
-												Steel
-											</Label>
-											<Input
-												id={`${country}-steel`}
-												type="number"
-												min={0}
-												value={countries[country].steel}
-												onChange={(e) =>
-													handleCountryResourceChange(
-														country,
-														"steel",
-														e.target.value,
-													)
-												}
-												required
-											/>
-										</div>
-										<div className="space-y-1">
-											<Label
-												htmlFor={`${country}-population`}
-												className="text-xs"
-											>
-												Population
-											</Label>
-											<Input
-												id={`${country}-population`}
-												type="number"
-												min={0}
-												value={countries[country].population}
-												onChange={(e) =>
-													handleCountryResourceChange(
-														country,
-														"population",
-														e.target.value,
-													)
-												}
-												required
-											/>
+							<div className="grid gap-6 md:grid-cols-2">
+								{COUNTRIES.map((country) => (
+									<div
+										key={country}
+										className="space-y-3 rounded-lg border p-4"
+									>
+										<h3 className="font-semibold">{country}</h3>
+										<div className="grid grid-cols-3 gap-2">
+											<div className="space-y-1">
+												<Label
+													htmlFor={`${country}-steel`}
+													className="text-[10px] uppercase text-muted-foreground"
+												>
+													Steel
+												</Label>
+												<Input
+													id={`${country}-steel`}
+													type="number"
+													value={countries[country].steel}
+													onChange={(e) =>
+														handleCountryResourceChange(
+															country,
+															"steel",
+															e.target.value,
+														)
+													}
+												/>
+											</div>
+											<div className="space-y-1">
+												<Label
+													htmlFor={`${country}-oil`}
+													className="text-[10px] uppercase text-muted-foreground"
+												>
+													Oil
+												</Label>
+												<Input
+													id={`${country}-oil`}
+													type="number"
+													value={countries[country].oil}
+													onChange={(e) =>
+														handleCountryResourceChange(
+															country,
+															"oil",
+															e.target.value,
+														)
+													}
+												/>
+											</div>
+											<div className="space-y-1">
+												<Label
+													htmlFor={`${country}-population`}
+													className="text-[10px] uppercase text-muted-foreground"
+												>
+													Population
+												</Label>
+												<Input
+													id={`${country}-population`}
+													type="number"
+													value={countries[country].population}
+													onChange={(e) =>
+														handleCountryResourceChange(
+															country,
+															"population",
+															e.target.value,
+														)
+													}
+												/>
+											</div>
 										</div>
 									</div>
-								</div>
-							))}
+								))}
+							</div>
 						</CardContent>
 					</Card>
 

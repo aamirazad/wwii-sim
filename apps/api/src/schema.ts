@@ -7,8 +7,8 @@ export const COUNTRIES = [
 	"Italy",
 	"Japan",
 	"Russia",
-	"UK",
-	"USA",
+	"United Kingdom",
+	"United States",
 ] as const;
 export type Country = (typeof COUNTRIES)[number];
 
@@ -33,8 +33,8 @@ export const CountrySchema = t.Union([
 	t.Literal("Italy"),
 	t.Literal("Japan"),
 	t.Literal("Russia"),
-	t.Literal("UK"),
-	t.Literal("USA"),
+	t.Literal("United Kingdom"),
+	t.Literal("United States"),
 ]);
 
 export const ServerMessageSchema = t.Union([
@@ -172,6 +172,20 @@ export const CountryConfigSchema = t.Object({
 
 export type CountryConfig = Static<typeof CountryConfigSchema>;
 
+export const DEFAULT_COUNTRY_STARTING_RESOURCES: Record<
+	Country,
+	CountryConfig
+> = {
+	Commonwealth: { oil: 30, steel: 5, population: 10 },
+	France: { oil: 50, steel: 30, population: 20 },
+	Germany: { oil: 300, steel: 150, population: 120 },
+	Italy: { oil: 50, steel: 60, population: 65 },
+	Japan: { oil: 80, steel: 100, population: 100 },
+	Russia: { oil: 100, steel: 2, population: 30 },
+	"United Kingdom": { oil: 1, steel: 2, population: 3 },
+	"United States": { oil: 999999, steel: 0, population: 0 },
+};
+
 export const CreateGameBodySchema = t.Object({
 	startDate: t.String(), // ISO date string
 	yearDurations: YearDurationsSchema,
@@ -182,8 +196,8 @@ export const CreateGameBodySchema = t.Object({
 		Italy: CountryConfigSchema,
 		Japan: CountryConfigSchema,
 		Russia: CountryConfigSchema,
-		UK: CountryConfigSchema,
-		USA: CountryConfigSchema,
+		"United Kingdom": CountryConfigSchema,
+		"United States": CountryConfigSchema,
 	}),
 });
 

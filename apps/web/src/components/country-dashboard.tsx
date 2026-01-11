@@ -1,10 +1,23 @@
 "use client";
 
-import { Dices, MoveRight, Pickaxe, Swords } from "lucide-react";
-import { useEffect } from "react";
+import { Dices, MoveRight, Pickaxe, Square, Swords } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useGame } from "@/app/game/GameContext";
 import Dock from "@/components/dock";
 import ExternalLink from "@/components/external-link";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { api } from "@/lib/api";
+import { getUserId } from "@/lib/cookies";
 
 interface CountryDashboardProps {
 	tab: string;
@@ -15,10 +28,17 @@ export default function CountryDashboard({
 	children,
 	tab,
 }: CountryDashboardProps) {
-	const { userState, connectionStatus, subscribedCountry, subscribeToCountry } =
-		useGame();
-	const time = new Date();
+	const {
+		userState,
+		connectionStatus,
+		subscribedCountry,
+		subscribeToCountry,
+		gameState,
+	} = useGame();
+	const _time = new Date();
 	const commitHash = process.env.NEXT_PUBLIC_COMMIT_SHA?.substring(0, 7);
+	const [isStopping, setIsStopping] = useState(false);
+	const userId = getUserId();
 
 	// Subscribe to country when connected and user has a country
 	useEffect(() => {
@@ -56,6 +76,38 @@ export default function CountryDashboard({
 
 	const gameYear = 1942; // Placeholder
 
+	const isAdmin =
+		userState.status === "authenticated" && userState.user.role === "admin";
+
+	const handleStopGame = async () => {
+		if (!userId || !isAdmin || gameState.status !== "has-game") return;
+
+		setIsStopping(true);
+		try {
+			const response = await api
+				.game({ gameId: gameState.game.id.toString() })
+				.stop.patch(
+					{},
+					{
+						query: { authorization: userId },
+					},
+				);
+
+			if (response.error) {
+				console.error("Failed to stop game");
+				alert("Failed to stop game");
+			} else {
+				// Reload the page to reflect the game status change
+				window.location.reload();
+			}
+		} catch (error) {
+			console.error("Error stopping game:", error);
+			alert("An error occurred while stopping the game");
+		} finally {
+			setIsStopping(false);
+		}
+	};
+
 	const dockItems = [
 		{
 			icon: <Pickaxe size={24} />,
@@ -91,6 +143,34 @@ export default function CountryDashboard({
 				</div>
 
 				<div className="flex items-center gap-3">
+					{isAdmin && gameState.status === "has-game" && (
+						<AlertDialog>
+							<AlertDialogTrigger
+								disabled={isStopping}
+								className="p-2 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+							>
+								<Square fill="#fb2c36" size={20} />
+							</AlertDialogTrigger>
+							<AlertDialogContent>
+								<AlertDialogHeader>
+									<AlertDialogTitle>End Game?</AlertDialogTitle>
+									<AlertDialogDescription>
+										This will immediately end the game for everyone and show the
+										game summary page.
+									</AlertDialogDescription>
+								</AlertDialogHeader>
+								<AlertDialogFooter>
+									<AlertDialogCancel>Cancel</AlertDialogCancel>
+									<AlertDialogAction
+										variant={"destructive"}
+										onClick={handleStopGame}
+									>
+										End Game
+									</AlertDialogAction>
+								</AlertDialogFooter>
+							</AlertDialogContent>
+						</AlertDialog>
+					)}
 					<p className="text-3xl font-mono font-bold text-white drop-shadow-lg">
 						{gameYear}
 					</p>
@@ -106,14 +186,11 @@ export default function CountryDashboard({
 					/>
 				</div>
 			</header>
-
-			{/* Main Content Island */}
 			<div className="mx-6 grow flex backdrop-brightness-50 backdrop-blur-3xl border border-white/10 rounded-xl shadow-2xl overflow-hidden relative">
 				{/* Inner Content */}
 				<div className="p-8 h-full overflow-auto w-full">{children}</div>
 			</div>
 
-			{/* Dock */}
 			<div className="flex">
 				<div className="p-4 grow flex gap-1 ml-4 text-zinc-400">{userName}</div>
 				<div className="hover:opacity-50 transition-color duration-300 opacity-0 text-sm sp pt-6 px-4">
