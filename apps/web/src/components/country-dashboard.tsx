@@ -1,9 +1,10 @@
 "use client";
 
-import { Dices, Pickaxe, Swords } from "lucide-react";
+import { Dices, MoveRight, Pickaxe, Swords } from "lucide-react";
 import { useEffect } from "react";
 import { useGame } from "@/app/game/GameContext";
 import Dock from "@/components/dock";
+import ExternalLink from "@/components/external-link";
 
 interface CountryDashboardProps {
 	tab: string;
@@ -17,6 +18,7 @@ export default function CountryDashboard({
 	const { userState, connectionStatus, subscribedCountry, subscribeToCountry } =
 		useGame();
 	const time = new Date();
+	const commitHash = process.env.NEXT_PUBLIC_COMMIT_SHA?.substring(0, 7);
 
 	// Subscribe to country when connected and user has a country
 	useEffect(() => {
@@ -75,57 +77,57 @@ export default function CountryDashboard({
 	return (
 		<div className="flex flex-col grow relative">
 			{/* Top Bar */}
-			<header className="w-full pt-6 px-8 pb-2 flex justify-between items-start">
-				<div className="flex flex-col">
+			<header className="w-full pt-4 px-8 pb-3 flex justify-between items-center">
+				<div className="flex items-baseline gap-4">
 					<h1 className="text-5xl font-black tracking-tighter uppercase text-white leading-none">
 						{country}
 					</h1>
-					<div className="flex items-center gap-2 mt-2">
-						<div className="h-0.5 w-10 bg-primary" />
-						<p className="text-sm font-bold tracking-[0.3em] text-zinc-400 uppercase">
-							{tab}
-						</p>
+					<div className="flex items-center gap-2">
+						<div className="flex items-center text-primary">
+							<MoveRight size={24} />
+						</div>
+						<p className="font-bold text-zinc-400 uppercase">{tab}</p>
 					</div>
 				</div>
 
-				<div className="flex gap-4">
-					<p className="text-lg font-medium text-zinc-400 border rounded-xl px-2 h-fit mt-2">
-						{userName}
+				<div className="flex items-center gap-3">
+					<p className="text-3xl font-mono font-bold text-white drop-shadow-lg">
+						{gameYear}
 					</p>
-					<div className="flex flex-col">
-						<p className="text-5xl font-mono font-bold text-white drop-shadow-lg">
-							{gameYear}
-						</p>
-						<div className="flex items-center gap-2">
-							<p className="text-lg font-medium text-zinc-400 font-mono">
-								{time.toLocaleTimeString([], {
-									hour: "2-digit",
-									minute: "2-digit",
-								})}
-							</p>
-							<div
-								className={`h-2 w-2 rounded-full ${connectionDotColor}`}
-								title={
-									connectionStatus === "connected"
-										? "Connected"
-										: connectionStatus === "connecting"
-											? "Connecting..."
-											: "Disconnected"
-								}
-							/>
-						</div>
-					</div>
+					<div
+						className={`h-2 w-2 rounded-full ${connectionDotColor}`}
+						title={
+							connectionStatus === "connected"
+								? "Connected"
+								: connectionStatus === "connecting"
+									? "Connecting..."
+									: "Disconnected"
+						}
+					/>
 				</div>
 			</header>
 
 			{/* Main Content Island */}
-			<div className="mx-6 grow flex bg-zinc-900/50 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl overflow-hidden relative">
+			<div className="mx-6 grow flex backdrop-brightness-50 backdrop-blur-3xl border border-white/10 rounded-xl shadow-2xl overflow-hidden relative">
 				{/* Inner Content */}
 				<div className="p-8 h-full overflow-auto w-full">{children}</div>
 			</div>
 
 			{/* Dock */}
-			<div className="">
+			<div className="flex">
+				<div className="p-4 grow flex gap-1 ml-4 text-zinc-400">{userName}</div>
+				<div className="hover:opacity-50 transition-color duration-300 opacity-0 text-sm sp pt-6 px-4">
+					{commitHash ? (
+						<p>
+							Build{" "}
+							<ExternalLink
+								href={`https://github.com/aamirazad/wwii-sim/tree/${process.env.NEXT_PUBLIC_COMMIT_SHA}`}
+							>
+								{commitHash}
+							</ExternalLink>
+						</p>
+					) : null}
+				</div>
 				<Dock
 					items={dockItems}
 					panelHeight={68}
