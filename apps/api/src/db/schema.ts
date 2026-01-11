@@ -20,8 +20,8 @@ export const COUNTRIES = [
 	"Italy",
 	"Japan",
 	"Russia",
-	"UK",
-	"USA",
+	"United Kingdom",
+	"United States",
 ] as const;
 export type Country = (typeof COUNTRIES)[number];
 

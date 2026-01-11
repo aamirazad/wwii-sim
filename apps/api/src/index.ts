@@ -566,6 +566,59 @@ const app = new Elysia()
 		},
 	)
 	.get(
+		"/game/:gameId/country/name/:countryName",
+		async ({ params, set }) => {
+			const gameId = Number.parseInt(params.gameId, 10);
+
+			const [country] = await db
+				.select()
+				.from(countryStateTable)
+				.where(
+					and(
+						eq(countryStateTable.gameId, gameId),
+						eq(countryStateTable.name, params.countryName),
+					),
+				);
+
+			if (!country) {
+				set.status = 404;
+				return { error: true as const, message: "Country not found" };
+			}
+
+			return {
+				error: false as const,
+				country: {
+					id: country.id,
+					name: country.name as Country,
+					gameId: country.gameId,
+					oil: country.oil,
+					steel: country.steel,
+					population: country.population,
+					createdAt: country.createdAt,
+					updatedAt: country.updatedAt,
+				},
+			};
+		},
+		{
+			params: t.Object({
+				gameId: t.String(),
+				countryName: CountrySchema,
+			}),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					country: CountryStateSchema,
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Get Country by Name",
+				description: "Returns a specific country state by name for a game.",
+				tags: ["Game"],
+			},
+		},
+	)
+	.get(
 		"/game/:gameId/country/:countryId/history",
 		async ({ params }) => {
 			const countryId = Number.parseInt(params.countryId, 10);
@@ -722,6 +775,65 @@ const app = new Elysia()
 				summary: "Update Country Resources",
 				description:
 					"Updates country resources and logs the change with a note.",
+				tags: ["Game"],
+			},
+		},
+	)
+	.patch(
+		"/game/:gameId/stop",
+		async ({ params, query, set }) => {
+			// Check if user is admin
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+
+			if (!user || user.role !== "admin") {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only admins can stop games",
+				};
+			}
+
+			const gameId = Number.parseInt(params.gameId, 10);
+
+			// Check if game exists
+			const [game] = await db
+				.select()
+				.from(gamesTable)
+				.where(eq(gamesTable.id, gameId));
+
+			if (!game) {
+				set.status = 404;
+				return { error: true as const, message: "Game not found" };
+			}
+
+			// Update game status to finished
+			await db
+				.update(gamesTable)
+				.set({ status: "finished" })
+				.where(eq(gamesTable.id, gameId));
+
+			return {
+				error: false as const,
+				message: "Game stopped successfully",
+			};
+		},
+		{
+			params: t.Object({
+				gameId: t.String(),
+			}),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					message: t.String(),
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Stop Game",
+				description: "Sets the game status to 'finished' (admin only).",
 				tags: ["Game"],
 			},
 		},
