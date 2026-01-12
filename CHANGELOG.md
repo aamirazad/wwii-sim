@@ -3,6 +3,7 @@
 <details>
 <summary>All commits</summary>
 
+- **Fix**(web): country dashboard flashing ([#51](https://github.com/aamirazad/wwii-sim/pull/51)) by [@aamirazad](https://github.com/aamirazad) - [`9066add...a6493c5`](https://github.com/aamirazad/wwii-sim/compare/9066add...a6493c5)
 - **Feature**: better detect game start and end ([#50](https://github.com/aamirazad/wwii-sim/pull/50)) by [@aamirazad](https://github.com/aamirazad) - [`96a8e6e...3673fb8`](https://github.com/aamirazad/wwii-sim/compare/96a8e6e...3673fb8)
 - **Feature**: new year process ([#49](https://github.com/aamirazad/wwii-sim/pull/49)) by [@aamirazad](https://github.com/aamirazad) - [`fe63876...4e740ce`](https://github.com/aamirazad/wwii-sim/compare/fe63876...4e740ce)
 - **Feature**: resources management ([#48](https://github.com/aamirazad/wwii-sim/pull/48)) by [@aamirazad](https://github.com/aamirazad) - [`94821d8...07074fc`](https://github.com/aamirazad/wwii-sim/compare/94821d8...07074fc)
