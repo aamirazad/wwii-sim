@@ -248,8 +248,18 @@ export default function JoinGame() {
 		connectionStatus,
 		subscribeToMessage,
 		sendMessage,
+		refetchGame,
 	} = useGame();
 	const router = useRouter();
+
+	// Poll for game status updates while on waiting screen
+	useEffect(() => {
+		const interval = setInterval(() => {
+			refetchGame();
+		}, 2000); // Poll every 2 seconds
+
+		return () => clearInterval(interval);
+	}, [refetchGame]);
 
 	// Listen for game start WebSocket message
 	useEffect(() => {

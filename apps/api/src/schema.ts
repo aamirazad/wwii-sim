@@ -90,6 +90,9 @@ export const ServerMessageSchema = t.Union([
 			population: t.Number(),
 		}),
 	}),
+	t.Object({
+		type: t.Literal("server.game.ended"),
+	}),
 ]);
 
 export type ServerMessage = Static<typeof ServerMessageSchema>;

@@ -8,6 +8,7 @@ import {
 	Square,
 	Swords,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useGame } from "@/app/game/GameContext";
 import Dock from "@/components/dock";
@@ -42,6 +43,7 @@ export default function CountryDashboard({
 		subscribeToCountry,
 		refetchGame,
 		gameState,
+		subscribeToMessage,
 	} = useGame();
 	const commitHash = process.env.NEXT_PUBLIC_COMMIT_SHA?.substring(0, 7);
 	const [isStopping, setIsStopping] = useState(false);
@@ -49,6 +51,7 @@ export default function CountryDashboard({
 	const [newYearOpen, setNewYearOpen] = useState(false);
 
 	const userId = getUserId();
+	const router = useRouter();
 
 	useEffect(() => {
 		if (gameState.status !== "has-game") return;
@@ -66,6 +69,14 @@ export default function CountryDashboard({
 			subscribeToCountry();
 		}
 	}, [connectionStatus, userState, subscribedCountry, subscribeToCountry]);
+
+	// Listen for game end WebSocket message
+	useEffect(() => {
+		const unsubscribe = subscribeToMessage("server.game.ended", () => {
+			router.push("/");
+		});
+		return unsubscribe;
+	}, [subscribeToMessage, router]);
 
 	const country =
 		userState.status === "authenticated" ? userState.user.country : null;

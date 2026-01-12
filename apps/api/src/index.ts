@@ -901,6 +901,14 @@ const app = new Elysia()
 			// Clear any scheduled year changes for this game
 			yearScheduler.clearGameSchedules(gameId);
 
+			// Broadcast game ended to all clients
+			app.server?.publish(
+				"global",
+				JSON.stringify({
+					type: "server.game.ended",
+				}),
+			);
+
 			return {
 				error: false as const,
 				message: "Game stopped successfully",
