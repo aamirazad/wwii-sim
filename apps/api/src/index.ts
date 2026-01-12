@@ -45,7 +45,8 @@ const app = new Elysia()
 	)
 	.use(
 		cors({
-			origin: process.env.CORS_ORIGIN,
+			origin:
+				/^(?:https?:\/\/)?(?:sim\.aamirazad\.com|[A-Za-z0-9-]+-aamira\.vercel\.app|localhost:3000)(?:\/.*)?$/,
 		}),
 	)
 	.get("/", () => "WWII Sim API", {
