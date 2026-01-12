@@ -9,6 +9,7 @@ import {
 	type Country,
 	countryStateTable,
 	type GameStatus,
+	gameStateTable,
 	gamesTable,
 	resourceChangeLogTable,
 	type UserRole,
@@ -20,6 +21,7 @@ import {
 	CountryStateSchema,
 	CreateGameBodySchema,
 	ErrorSchema,
+	ExtendedGameSchema,
 	GameSchema,
 	ResourceChangeLogSchema,
 	ServerMessageSchema,
@@ -27,6 +29,7 @@ import {
 	UserSchema,
 	type YearDurations,
 } from "./schema";
+import { yearScheduler } from "./services/year-scheduler";
 
 const app = new Elysia()
 	.use(
@@ -140,6 +143,10 @@ const app = new Elysia()
 						.update(gamesTable)
 						.set({ status: "active" })
 						.where(eq(gamesTable.id, message.gameId));
+
+					// Schedule year changes for the game
+					await yearScheduler.scheduleGameYears(message.gameId);
+
 					ws.send({
 						type: "server.game.started",
 					});
@@ -281,6 +288,19 @@ const app = new Elysia()
 				return { exists: false as const };
 			}
 
+			let [gameState] = await db
+				.select({ currentYear: gameStateTable.currentYear })
+				.from(gameStateTable)
+				.where(eq(gameStateTable.gameId, game.id));
+
+			if (!gameState) {
+				await db.insert(gameStateTable).values({
+					gameId: game.id,
+					currentYear: 1938,
+				});
+				gameState = { currentYear: 1938 };
+			}
+
 			return {
 				exists: true as const,
 				game: {
@@ -289,13 +309,14 @@ const app = new Elysia()
 					startDate: game.startDate,
 					yearDurations: game.yearDurations as YearDurations,
 					createdAt: game.createdAt,
+					currentYear: gameState.currentYear,
 				},
 			};
 		},
 		{
 			response: t.Object({
 				exists: t.Boolean(),
-				game: t.Optional(GameSchema),
+				game: t.Optional(ExtendedGameSchema),
 			}),
 			detail: {
 				summary: "Get Current Active Game",
@@ -442,6 +463,12 @@ const app = new Elysia()
 					yearDurations: body.yearDurations,
 				})
 				.returning();
+
+			// Initialize game state
+			await db.insert(gameStateTable).values({
+				gameId: newGame.id,
+				currentYear: 1938,
+			});
 
 			// Create country states for all countries
 			const countryStates = [];
@@ -665,6 +692,52 @@ const app = new Elysia()
 			},
 		},
 	)
+	.get(
+		"/game/:gameId/year",
+		async ({ params, set }) => {
+			const gameId = Number.parseInt(params.gameId, 10);
+
+			const [gameState] = await db
+				.select()
+				.from(gameStateTable)
+				.where(eq(gameStateTable.gameId, gameId));
+
+			if (!gameState) {
+				set.status = 404;
+				return { error: true as const, message: "Game not found" };
+			}
+
+			return {
+				error: false as const,
+				currentYear: gameState.currentYear,
+			};
+		},
+		{
+			params: t.Object({
+				gameId: t.String(),
+			}),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					currentYear: t.Number(),
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Get Current Game Year",
+				description: "Returns the current year of the game.",
+				tags: ["Game"],
+			},
+		},
+	)
+	.post("/game/:gameId/next-year", async ({ params }) => {
+		const gameId = Number.parseInt(params.gameId, 10);
+		await yearScheduler.handleYearChange(
+			gameId,
+			(await yearScheduler.getCurrentYear(gameId)) + 1,
+		);
+		return { error: false as const };
+	})
 	.patch(
 		"/game/:gameId/country/:countryId/resources",
 		async ({ params, body, query, set }) => {
@@ -680,6 +753,16 @@ const app = new Elysia()
 			if (!country) {
 				set.status = 404;
 				return { error: true as const, message: "Country not found" };
+			}
+
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+
+			if (user.country !== country.name) {
+				set.status = 403;
+				return { error: true as const, message: "Unauthorized" };
 			}
 
 			// Log changes for each resource that was modified
@@ -703,7 +786,7 @@ const app = new Elysia()
 						previousValue: country[resourceType],
 						newValue: body[resourceType],
 						note: body.note,
-						changedBy: query.authorization,
+						changedBy: user.name,
 						createdAt: new Date(),
 					});
 					updates[resourceType] = body[resourceType];
@@ -815,6 +898,9 @@ const app = new Elysia()
 				.set({ status: "finished" })
 				.where(eq(gamesTable.id, gameId));
 
+			// Clear any scheduled year changes for this game
+			yearScheduler.clearGameSchedules(gameId);
+
 			return {
 				error: false as const,
 				message: "Game stopped successfully",
@@ -839,6 +925,14 @@ const app = new Elysia()
 		},
 	)
 	.listen(3001);
+
+// Set the app instance in the year scheduler so it can publish WebSocket messages
+yearScheduler.setApp(app);
+
+// Initialize year scheduler for any active games on server start
+yearScheduler.initializeActiveGames().catch((err) => {
+	console.error("Failed to initialize year scheduler:", err);
+});
 
 console.log(
 	`🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`,
