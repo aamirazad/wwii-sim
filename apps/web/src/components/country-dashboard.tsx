@@ -91,7 +91,15 @@ export default function CountryDashboard({
 		return (
 			<div className="flex items-center justify-center h-64">
 				<p className="text-muted-foreground">
-					You are not assigned to a country. Please contact an admin.
+					{userState.status === "authenticated" &&
+					userState.user.role === "admin" ? (
+						<>
+							You are not assigned to a country. You can assign users to
+							countries <ExternalLink href="/admin/users">here</ExternalLink>.
+						</>
+					) : (
+						"You are not assigned to a country. Please contact an admin."
+					)}
 				</p>
 			</div>
 		);
