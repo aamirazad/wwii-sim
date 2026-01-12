@@ -53,10 +53,14 @@ export default function CountryDashboard({
 	const userId = getUserId();
 	const router = useRouter();
 
+	const yearFromGameState =
+		gameState.status === "has-game" ? gameState.game.currentYear : null;
+
 	useEffect(() => {
-		if (gameState.status !== "has-game") return;
-		setCurrentYear(gameState.game.currentYear);
-	}, [gameState]);
+		if (yearFromGameState !== null) {
+			setCurrentYear(yearFromGameState);
+		}
+	}, [yearFromGameState]);
 
 	// Subscribe to country when connected and user has a country
 	useEffect(() => {
