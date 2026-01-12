@@ -63,7 +63,8 @@ export const gameStateTable = t.sqliteTable("game_state", {
 	gameId: t
 		.int("game_id")
 		.notNull()
-		.references(() => gamesTable.id),
+		.references(() => gamesTable.id, { onDelete: "cascade" }),
+	currentYear: t.int("current_year").notNull().default(1938),
 	data: t.text("data", { mode: "json" }),
 	updatedAt: t
 		.integer("updated_at", { mode: "timestamp" })
@@ -77,7 +78,7 @@ export const countryStateTable = t.sqliteTable("country_state", {
 	gameId: t
 		.int("game_id")
 		.notNull()
-		.references(() => gamesTable.id),
+		.references(() => gamesTable.id, { onDelete: "cascade" }),
 	// Resources
 	oil: t.int("oil").default(0).notNull(),
 	steel: t.int("steel").default(0).notNull(),
@@ -98,11 +99,11 @@ export const resourceChangeLogTable = t.sqliteTable("resource_change_log", {
 	countryStateId: t
 		.int("country_state_id")
 		.notNull()
-		.references(() => countryStateTable.id),
+		.references(() => countryStateTable.id, { onDelete: "cascade" }),
 	gameId: t
 		.int("game_id")
 		.notNull()
-		.references(() => gamesTable.id),
+		.references(() => gamesTable.id, { onDelete: "cascade" }),
 	// Which resource changed
 	resourceType: t
 		.text("resource_type")
@@ -117,7 +118,7 @@ export const resourceChangeLogTable = t.sqliteTable("resource_change_log", {
 	changedBy: t
 		.text("changed_by")
 		.notNull()
-		.references(() => usersTable.id),
+		.references(() => usersTable.id, { onDelete: "cascade" }),
 	createdAt: t
 		.integer("created_at", { mode: "timestamp" })
 		.default(new Date())

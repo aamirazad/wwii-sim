@@ -81,6 +81,15 @@ export const ServerMessageSchema = t.Union([
 			population: t.Number(),
 		}),
 	}),
+	t.Object({
+		type: t.Literal("server.year.changed"),
+		year: t.Number(),
+		resourceChanges: t.Object({
+			oil: t.Number(),
+			steel: t.Number(),
+			population: t.Number(),
+		}),
+	}),
 ]);
 
 export type ServerMessage = Static<typeof ServerMessageSchema>;
@@ -155,6 +164,17 @@ export const GameSchema = t.Object({
 });
 
 export type Game = Static<typeof GameSchema>;
+
+export const ExtendedGameSchema = t.Object({
+	id: t.Number(),
+	status: GameStatusSchema,
+	startDate: t.Date(),
+	yearDurations: t.Nullable(YearDurationsSchema),
+	currentYear: t.Number(),
+	createdAt: t.Date(),
+});
+
+export type ExtendedGame = Static<typeof ExtendedGameSchema>;
 
 export const CountryResourcesSchema = t.Object({
 	oil: t.Number(),

@@ -4,7 +4,7 @@ import type {
 	ClientMessage,
 	Country,
 	CountryResources,
-	Game,
+	ExtendedGame,
 	ServerMessage,
 	User,
 } from "@api/schema";
@@ -26,7 +26,7 @@ type GameState =
 	| { status: "loading" }
 	| { status: "error"; message: string }
 	| { status: "no-game" }
-	| { status: "has-game"; game: Game };
+	| { status: "has-game"; game: ExtendedGame };
 
 type UserState =
 	| { status: "loading" }
@@ -47,6 +47,7 @@ interface GameContextType {
 	subscribeToMessage: (type: string, handler: MessageHandler) => () => void;
 	sendMessage: (message: ClientMessage) => void;
 	subscribeToCountry: () => void;
+	refetchGame: () => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -172,6 +173,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 		data: gameData,
 		isLoading: gameLoading,
 		isError: gameError,
+		refetch: refetchGame,
 	} = useQuery({
 		queryKey: ["game", "current"],
 		queryFn: async () => {
@@ -230,6 +232,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 				subscribeToMessage,
 				sendMessage,
 				subscribeToCountry,
+				refetchGame,
 			}}
 		>
 			{children}

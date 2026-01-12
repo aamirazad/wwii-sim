@@ -8,6 +8,7 @@
 		"db:migrate": "drizzle-kit migrate",
 		"db:push": "drizzle-kit push",
 		"db:studio": "drizzle-kit studio",
+		"db:sync": "rsync db-prod.sqlite aamir@raspberrypi:/home/aamir/apps/wwii-api/data",
 		"lint": "biome check"
 	},
 	"dependencies": {

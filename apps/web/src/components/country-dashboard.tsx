@@ -1,6 +1,13 @@
 "use client";
 
-import { Dices, MoveRight, Pickaxe, Square, Swords } from "lucide-react";
+import {
+	ClockPlus,
+	Dices,
+	MoveRight,
+	Pickaxe,
+	Square,
+	Swords,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useGame } from "@/app/game/GameContext";
 import Dock from "@/components/dock";
@@ -33,12 +40,20 @@ export default function CountryDashboard({
 		connectionStatus,
 		subscribedCountry,
 		subscribeToCountry,
+		refetchGame,
 		gameState,
 	} = useGame();
-	const _time = new Date();
 	const commitHash = process.env.NEXT_PUBLIC_COMMIT_SHA?.substring(0, 7);
 	const [isStopping, setIsStopping] = useState(false);
+	const [currentYear, setCurrentYear] = useState<number | null>(null);
+	const [newYearOpen, setNewYearOpen] = useState(false);
+
 	const userId = getUserId();
+
+	useEffect(() => {
+		if (gameState.status !== "has-game") return;
+		setCurrentYear(gameState.game.currentYear);
+	}, [gameState]);
 
 	// Subscribe to country when connected and user has a country
 	useEffect(() => {
@@ -74,8 +89,6 @@ export default function CountryDashboard({
 				? "bg-yellow-500"
 				: "bg-red-500";
 
-	const gameYear = 1942; // Placeholder
-
 	const isAdmin =
 		userState.status === "authenticated" && userState.user.role === "admin";
 
@@ -92,13 +105,10 @@ export default function CountryDashboard({
 						query: { authorization: userId },
 					},
 				);
-
+			refetchGame();
 			if (response.error) {
 				console.error("Failed to stop game");
 				alert("Failed to stop game");
-			} else {
-				// Reload the page to reflect the game status change
-				window.location.reload();
 			}
 		} catch (error) {
 			console.error("Error stopping game:", error);
@@ -106,6 +116,15 @@ export default function CountryDashboard({
 		} finally {
 			setIsStopping(false);
 		}
+	};
+
+	const handleTriggerNewYear = async () => {
+		if (!userId || !isAdmin || gameState.status !== "has-game") return;
+		setNewYearOpen(false);
+
+		await api
+			.game({ gameId: gameState.game.id.toString() })
+			["next-year"].post({}, { query: { authorization: userId } });
 	};
 
 	const dockItems = [
@@ -144,35 +163,61 @@ export default function CountryDashboard({
 
 				<div className="flex items-center gap-3">
 					{isAdmin && gameState.status === "has-game" && (
-						<AlertDialog>
-							<AlertDialogTrigger
-								disabled={isStopping}
-								className="p-2 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-							>
-								<Square fill="#fb2c36" size={20} />
-							</AlertDialogTrigger>
-							<AlertDialogContent>
-								<AlertDialogHeader>
-									<AlertDialogTitle>End Game?</AlertDialogTitle>
-									<AlertDialogDescription>
-										This will immediately end the game for everyone and show the
-										game summary page.
-									</AlertDialogDescription>
-								</AlertDialogHeader>
-								<AlertDialogFooter>
-									<AlertDialogCancel>Cancel</AlertDialogCancel>
-									<AlertDialogAction
-										variant={"destructive"}
-										onClick={handleStopGame}
-									>
-										End Game
-									</AlertDialogAction>
-								</AlertDialogFooter>
-							</AlertDialogContent>
-						</AlertDialog>
+						<>
+							{currentYear && (
+								<AlertDialog open={newYearOpen} onOpenChange={setNewYearOpen}>
+									<AlertDialogTrigger className="p-2 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+										<ClockPlus size={20} />
+									</AlertDialogTrigger>
+									<AlertDialogContent>
+										<AlertDialogHeader>
+											<AlertDialogTitle>
+												Manually Trigger New Year?
+											</AlertDialogTitle>
+											<AlertDialogDescription>
+												This will immediately change the year to{" "}
+												{currentYear + 1}.
+											</AlertDialogDescription>
+										</AlertDialogHeader>
+										<AlertDialogFooter>
+											<AlertDialogCancel>Cancel</AlertDialogCancel>
+											<AlertDialogAction onClick={handleTriggerNewYear}>
+												Trigger New Year
+											</AlertDialogAction>
+										</AlertDialogFooter>
+									</AlertDialogContent>
+								</AlertDialog>
+							)}
+							<AlertDialog>
+								<AlertDialogTrigger
+									disabled={isStopping}
+									className="p-2 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+								>
+									<Square fill="#fb2c36" size={20} />
+								</AlertDialogTrigger>
+								<AlertDialogContent>
+									<AlertDialogHeader>
+										<AlertDialogTitle>End Game?</AlertDialogTitle>
+										<AlertDialogDescription>
+											This will immediately end the game for everyone and show
+											the game summary page.
+										</AlertDialogDescription>
+									</AlertDialogHeader>
+									<AlertDialogFooter>
+										<AlertDialogCancel>Cancel</AlertDialogCancel>
+										<AlertDialogAction
+											variant={"destructive"}
+											onClick={handleStopGame}
+										>
+											End Game
+										</AlertDialogAction>
+									</AlertDialogFooter>
+								</AlertDialogContent>
+							</AlertDialog>
+						</>
 					)}
 					<p className="text-3xl font-mono font-bold text-white drop-shadow-lg">
-						{gameYear}
+						{currentYear}
 					</p>
 					<div
 						className={`h-2 w-2 rounded-full ${connectionDotColor}`}

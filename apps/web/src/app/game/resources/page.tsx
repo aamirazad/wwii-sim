@@ -2,7 +2,7 @@
 
 import type { CountryState, ResourceChangeLog } from "@api/schema";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Droplet, History, Users } from "lucide-react";
+import { Droplets, Hammer, History, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 import CountryDashboard from "@/components/country-dashboard";
@@ -71,6 +71,9 @@ function ResourceChangeForm({
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
+	const anyNegative =
+		resultingOil < 0 || resultingSteel < 0 || resultingPopulation < 0;
+
 	const handleSubmit = async (e: FormEvent) => {
 		e.preventDefault();
 		if (!userId || !note.trim()) return;
@@ -131,59 +134,60 @@ function ResourceChangeForm({
 	return (
 		<form onSubmit={handleSubmit} className="space-y-4">
 			<div className="grid grid-cols-3 gap-4">
-				<div className="space-y-2">
-					<Label htmlFor="steel">Steel Change</Label>
-					<Input
-						id="steel"
-						type="number"
-						placeholder="+50 or -10"
-						value={steelChange}
-						onChange={(e) => {
-							setSteelChange(e.target.value);
-							setResultingSteel(countryState.steel + Number(e.target.value));
-						}}
-					/>
-					<p className="text-xs truncate text-muted-foreground">
-						Result: {resultingSteel.toLocaleString()}
-					</p>
-				</div>
-				<div className="space-y-2">
-					<Label htmlFor="oil">Oil Change</Label>
-					<Input
-						id="oil"
-						type="number"
-						placeholder="+50 or -10"
-						value={oilChange}
-						onChange={(e) => {
-							setOilChange(e.target.value);
-							setResultingOil(countryState.oil + Number(e.target.value));
-						}}
-					/>
-					<p
-						className={`text-xs truncate ${resultingOil < 0 ? " text-destructive" : "text-muted-foreground"}`}
-					>
-						Result: {resultingOil.toLocaleString()}
-					</p>
-				</div>
-
-				<div className="space-y-2">
-					<Label htmlFor="population">Population Change</Label>
-					<Input
-						id="population"
-						type="number"
-						placeholder="+50 or -10"
-						value={populationChange}
-						onChange={(e) => {
-							setPopulationChange(e.target.value);
-							setResultingPopulation(
-								countryState.population + Number(e.target.value),
-							);
-						}}
-					/>
-					<p className="text-xs truncate text-muted-foreground">
-						Result: {resultingPopulation.toLocaleString()}
-					</p>
-				</div>
+				{[
+					{
+						id: "steel",
+						label: "Steel",
+						value: steelChange,
+						setValue: setSteelChange,
+						resulting: resultingSteel,
+						setResulting: setResultingSteel,
+						base: countryState.steel,
+					},
+					{
+						id: "oil",
+						label: "Oil",
+						value: oilChange,
+						setValue: setOilChange,
+						resulting: resultingOil,
+						setResulting: setResultingOil,
+						base: countryState.oil,
+					},
+					{
+						id: "population",
+						label: "Population",
+						value: populationChange,
+						setValue: setPopulationChange,
+						resulting: resultingPopulation,
+						setResulting: setResultingPopulation,
+						base: countryState.population,
+					},
+				].map(
+					({ id, label, value, setValue, resulting, setResulting, base }) => (
+						<div key={id} className="space-y-2">
+							<Label htmlFor={id}>{label} Change</Label>
+							<Input
+								id={id}
+								type="number"
+								placeholder="+50 or -10"
+								value={value}
+								className={`transition-all  duration-200 ${Number(value) < 0 ? "text-rose-300" : "text-emerald-300"}`}
+								onChange={(e) => {
+									const v = e.target.value;
+									setValue(v);
+									setResulting(base + Number(v));
+								}}
+							/>
+							{value && (
+								<p
+									className={`text-xs transition-all truncate ${resulting < 0 ? "text-destructive font-bold" : "text-muted-foreground font-normal"}`}
+								>
+									Result: {resulting.toLocaleString()}
+								</p>
+							)}
+						</div>
+					),
+				)}
 			</div>
 			<div className="space-y-2">
 				<Label htmlFor="note">Reason for Change *</Label>
@@ -196,9 +200,16 @@ function ResourceChangeForm({
 				/>
 			</div>
 			{error && <p className="text-sm text-destructive">{error}</p>}
-			<Button type="submit" disabled={isSubmitting || !note.trim()}>
-				{isSubmitting ? "Submitting..." : "Submit Change"}
-			</Button>
+			<div
+				title={anyNegative ? "Resulting amounts cannot be negative" : undefined}
+			>
+				<Button
+					type="submit"
+					disabled={isSubmitting || !note.trim() || anyNegative}
+				>
+					{isSubmitting ? "Submitting..." : "Submit Change"}
+				</Button>
+			</div>
 		</form>
 	);
 }
@@ -279,10 +290,8 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 							return (
 								<div key={resourceType} className="space-y-2">
 									<h3 className="font-semibold capitalize flex items-center gap-2">
-										{resourceType === "oil" && <Droplet className="h-4 w-4" />}
-										{resourceType === "steel" && (
-											<div className="h-4 w-4 bg-zinc-500 rounded-sm" />
-										)}
+										{resourceType === "oil" && <Droplets className="h-4 w-4" />}
+										{resourceType === "steel" && <Hammer className="h-4 w-4" />}
 										{resourceType === "population" && (
 											<Users className="h-4 w-4" />
 										)}
@@ -315,7 +324,8 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 													return (
 														<tr key={log.id} className="border-t">
 															<td
-																className={`truncate min-w-24 max-w-24 px-3 py-2 font-mono ${isPositive ? "text-green-500" : "text-red-500"}`}
+																title={`Changed by ${log.changedBy}`}
+																className={`truncate min-w-24 max-w-24 px-3 py-2 font-mono ${isPositive ? "text-emerald-300" : "text-rose-300"}`}
 															>
 																{isPositive ? "+" : ""}
 																{change.toLocaleString()}
@@ -425,12 +435,12 @@ export default function GameResources() {
 					<ResourceCard
 						name="Steel"
 						value={countryResources.steel}
-						icon={<div className="h-5 w-5 bg-zinc-500 rounded-sm" />}
+						icon={<Hammer className="h-5 w-5" />}
 					/>
 					<ResourceCard
 						name="Oil"
 						value={countryResources.oil}
-						icon={<Droplet className="h-5 w-5" />}
+						icon={<Droplets className="h-5 w-5" />}
 					/>
 					<ResourceCard
 						name="Population"
