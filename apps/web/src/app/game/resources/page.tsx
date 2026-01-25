@@ -117,7 +117,14 @@ function ResourceChangeForm({
 				);
 
 			if (response.error) {
-				setError("Failed to update resources");
+				if (response.error.value.message) {
+					setError(response.error.value.message);
+				} else {
+					setError("Failed to update resources");
+				}
+				setOilChange("");
+				setSteelChange("");
+				setPopulationChange("");
 				return;
 			}
 
@@ -210,23 +217,25 @@ function ResourceChangeForm({
 			</div>
 			{error && <p className="text-sm text-destructive">{error}</p>}
 			<Tooltip>
-				<TooltipTrigger>
-					<Button
-						type="submit"
-						disabled={isSubmitting || !note.trim() || anyNegative}
-					>
-						{isSubmitting ? "Submitting..." : "Submit Change"}
-					</Button>
-					<TooltipContent>
-						{anyNegative ? (
-							"Resulting amounts cannot be negative"
-						) : (
-							<KbdGroup>
-								<Kbd>Ctrl</Kbd>+<Kbd>Enter</Kbd>
-							</KbdGroup>
-						)}
-					</TooltipContent>
-				</TooltipTrigger>
+				<TooltipTrigger
+					render={
+						<Button
+							type="submit"
+							disabled={isSubmitting || !note.trim() || anyNegative}
+						>
+							{isSubmitting ? "Submitting..." : "Submit Change"}
+						</Button>
+					}
+				></TooltipTrigger>
+				<TooltipContent>
+					{anyNegative ? (
+						"Resulting amounts cannot be negative"
+					) : (
+						<KbdGroup>
+							<Kbd>Ctrl</Kbd>+<Kbd>Enter</Kbd>
+						</KbdGroup>
+					)}
+				</TooltipContent>
 			</Tooltip>
 		</form>
 	);
@@ -351,7 +360,7 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 															<td className="truncate min-w-24 max-w-24 px-3 py-2 font-medium">
 																{log.newValue.toLocaleString()}
 															</td>
-															<td className="px-3 py-2 min-w-50 max-w-50 truncate">
+															<td className="px-3 py-2 min-w-50 max-w-50">
 																{log.note}
 															</td>
 															<td className="px-3 py-2  text-muted-foreground">

@@ -498,8 +498,8 @@ const app = new Elysia()
 							resourceType,
 							previousValue: 0,
 							newValue: countryConfig[resourceType],
-							note: "Initial game setup",
-							changedBy: query.authorization,
+							note: "Starting amount",
+							changedBy: "system",
 							createdAt: new Date(),
 						});
 					}
@@ -790,7 +790,7 @@ const app = new Elysia()
 			}
 
 			// Atomically update the country state and get the new values
-			const [updatedCountry] = await db
+			let [updatedCountry] = await db
 				.update(countryStateTable)
 				.set(updateFields)
 				.where(eq(countryStateTable.id, countryId))
@@ -833,6 +833,32 @@ const app = new Elysia()
 				}
 			}
 
+			let error = false;
+			for (const { type, prev, curr } of resources) {
+				if (curr < 0) {
+					const updateField: Record<string, unknown> = {
+						updatedAt: new Date(),
+					};
+					updateField[type] = prev;
+					[updatedCountry] = await db
+						.update(countryStateTable)
+						.set(updateField)
+						.where(eq(countryStateTable.id, countryId))
+						.returning();
+					await db.insert(resourceChangeLogTable).values({
+						countryStateId: countryId,
+						gameId,
+						resourceType: type,
+						previousValue: curr,
+						newValue: updatedCountry[type],
+						note: "Undo change to prevent negative value",
+						changedBy: "system",
+						createdAt: new Date(),
+					});
+					error = true;
+				}
+			}
+
 			// Broadcast resource update to country subscribers
 			const countryName = country.name as Country;
 			app.server?.publish(
@@ -847,6 +873,15 @@ const app = new Elysia()
 					},
 				}),
 			);
+
+			if (error) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message:
+						"One or more of your changes would have resulted in a negative value. The affected changes have been undone. See the history for details.",
+				};
+			}
 
 			return {
 				error: false as const,
