@@ -19,8 +19,14 @@ import {
 	DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
 import { useGame } from "../GameContext";
@@ -99,13 +105,10 @@ function ResourceChangeForm({
 				.country({ countryId: String(countryState.id) })
 				.resources.patch(
 					{
-						oil: oilDelta !== 0 ? countryState.oil + oilDelta : undefined,
-						steel:
-							steelDelta !== 0 ? countryState.steel + steelDelta : undefined,
-						population:
-							populationDelta !== 0
-								? countryState.population + populationDelta
-								: undefined,
+						oilDelta: oilDelta !== 0 ? oilDelta : undefined,
+						steelDelta: steelDelta !== 0 ? steelDelta : undefined,
+						populationDelta:
+							populationDelta !== 0 ? populationDelta : undefined,
 						note: note.trim(),
 					},
 					{
@@ -197,19 +200,34 @@ function ResourceChangeForm({
 					value={note}
 					onChange={(e) => setNote(e.target.value)}
 					required
+					onKeyDown={(event) => {
+						if (event.key === "Enter" && event.ctrlKey) {
+							event.preventDefault();
+							event.currentTarget.form?.requestSubmit();
+						}
+					}}
 				/>
 			</div>
 			{error && <p className="text-sm text-destructive">{error}</p>}
-			<div
-				title={anyNegative ? "Resulting amounts cannot be negative" : undefined}
-			>
-				<Button
-					type="submit"
-					disabled={isSubmitting || !note.trim() || anyNegative}
-				>
-					{isSubmitting ? "Submitting..." : "Submit Change"}
-				</Button>
-			</div>
+			<Tooltip>
+				<TooltipTrigger>
+					<Button
+						type="submit"
+						disabled={isSubmitting || !note.trim() || anyNegative}
+					>
+						{isSubmitting ? "Submitting..." : "Submit Change"}
+					</Button>
+					<TooltipContent>
+						{anyNegative ? (
+							"Resulting amounts cannot be negative"
+						) : (
+							<KbdGroup>
+								<Kbd>Ctrl</Kbd>+<Kbd>Enter</Kbd>
+							</KbdGroup>
+						)}
+					</TooltipContent>
+				</TooltipTrigger>
+			</Tooltip>
 		</form>
 	);
 }
