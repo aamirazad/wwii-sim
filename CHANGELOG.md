@@ -3,6 +3,7 @@
 <details>
 <summary>All commits</summary>
 
+- **Feature**: prevent negatives with the delta system ([#59](https://github.com/aamirazad/wwii-sim/pull/59)) by [@aamirazad](https://github.com/aamirazad) - [`a7454c8...990da61`](https://github.com/aamirazad/wwii-sim/compare/a7454c8...990da61)
 - **Fix**: resource change race condition ([#58](https://github.com/aamirazad/wwii-sim/pull/58)) by [@aamirazad](https://github.com/aamirazad) - [`e2c3222...22f590e`](https://github.com/aamirazad/wwii-sim/compare/e2c3222...22f590e)
 - **Feature**: non animated background ([#52](https://github.com/aamirazad/wwii-sim/pull/52)) by [@aamirazad](https://github.com/aamirazad) - [`9c48525...5126058`](https://github.com/aamirazad/wwii-sim/compare/9c48525...5126058)
 - **Fix**(web): country dashboard flashing ([#51](https://github.com/aamirazad/wwii-sim/pull/51)) by [@aamirazad](https://github.com/aamirazad) - [`9066add...a6493c5`](https://github.com/aamirazad/wwii-sim/compare/9066add...a6493c5)
