@@ -1,6 +1,6 @@
 import { cors } from "@elysiajs/cors";
 import { fromTypes, openapi } from "@elysiajs/openapi";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import packageJson from "../package.json";
 import { db } from "./db";
@@ -766,62 +766,87 @@ const app = new Elysia()
 				return { error: true as const, message: "Unauthorized" };
 			}
 
-			// Log changes for each resource that was modified
-			const updates: Partial<{
-				oil: number;
-				steel: number;
-				population: number;
-			}> = {};
-			const resources = ["oil", "steel", "population"] as const;
+			const oilDelta = body.oilDelta ?? 0;
+			const steelDelta = body.steelDelta ?? 0;
+			const populationDelta = body.populationDelta ?? 0;
 
-			for (const resourceType of resources) {
-				if (
-					body[resourceType] !== undefined &&
-					body[resourceType] !== country[resourceType]
-				) {
-					// Log the change
+			if (oilDelta === 0 && steelDelta === 0 && populationDelta === 0) {
+				set.status = 400;
+				return { error: true as const, message: "No changes specified" };
+			}
+
+			// Build atomic update using SQL to avoid race conditions
+			const updateFields: Record<string, unknown> = {
+				updatedAt: new Date(),
+			};
+			if (oilDelta !== 0) {
+				updateFields.oil = sql`${countryStateTable.oil} + ${oilDelta}`;
+			}
+			if (steelDelta !== 0) {
+				updateFields.steel = sql`${countryStateTable.steel} + ${steelDelta}`;
+			}
+			if (populationDelta !== 0) {
+				updateFields.population = sql`${countryStateTable.population} + ${populationDelta}`;
+			}
+
+			// Atomically update the country state and get the new values
+			const [updatedCountry] = await db
+				.update(countryStateTable)
+				.set(updateFields)
+				.where(eq(countryStateTable.id, countryId))
+				.returning();
+
+			// Log changes for each resource that was modified
+			const resources = [
+				{
+					type: "oil" as const,
+					delta: oilDelta,
+					prev: country.oil,
+					curr: updatedCountry.oil,
+				},
+				{
+					type: "steel" as const,
+					delta: steelDelta,
+					prev: country.steel,
+					curr: updatedCountry.steel,
+				},
+				{
+					type: "population" as const,
+					delta: populationDelta,
+					prev: country.population,
+					curr: updatedCountry.population,
+				},
+			];
+
+			for (const { type, delta, prev, curr } of resources) {
+				if (delta !== 0) {
 					await db.insert(resourceChangeLogTable).values({
 						countryStateId: countryId,
 						gameId,
-						resourceType,
-						previousValue: country[resourceType],
-						newValue: body[resourceType],
+						resourceType: type,
+						previousValue: prev,
+						newValue: curr,
 						note: body.note,
 						changedBy: user.name,
 						createdAt: new Date(),
 					});
-					updates[resourceType] = body[resourceType];
 				}
 			}
 
-			// Update the country state
-			if (Object.keys(updates).length > 0) {
-				await db
-					.update(countryStateTable)
-					.set({ ...updates, updatedAt: new Date() })
-					.where(eq(countryStateTable.id, countryId));
-
-				// Broadcast resource update to country subscribers
-				const countryName = country.name as Country;
-				app.server?.publish(
-					`country:${countryName}`,
-					JSON.stringify({
-						type: "server.country.resources",
-						country: countryName,
-						resources: {
-							oil: updates.oil ?? country.oil,
-							steel: updates.steel ?? country.steel,
-							population: updates.population ?? country.population,
-						},
-					}),
-				);
-			}
-
-			// Get updated country
-			const [updatedCountry] = await db
-				.select()
-				.from(countryStateTable)
-				.where(eq(countryStateTable.id, countryId));
+			// Broadcast resource update to country subscribers
+			const countryName = country.name as Country;
+			app.server?.publish(
+				`country:${countryName}`,
+				JSON.stringify({
+					type: "server.country.resources",
+					country: countryName,
+					resources: {
+						oil: updatedCountry.oil,
+						steel: updatedCountry.steel,
+						population: updatedCountry.population,
+					},
+				}),
+			);
 
 			return {
 				error: false as const,
@@ -843,9 +868,9 @@ const app = new Elysia()
 				countryId: t.String(),
 			}),
 			body: t.Object({
-				oil: t.Optional(t.Number()),
-				steel: t.Optional(t.Number()),
-				population: t.Optional(t.Number()),
+				oilDelta: t.Optional(t.Number()),
+				steelDelta: t.Optional(t.Number()),
+				populationDelta: t.Optional(t.Number()),
 				note: t.String(),
 			}),
 			response: t.Union([
