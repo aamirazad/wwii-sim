@@ -9,6 +9,7 @@ import type {
 	User,
 } from "@api/schema";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import {
 	createContext,
 	type ReactNode,
@@ -61,6 +62,7 @@ export function useGame() {
 }
 
 export function GameProvider({ children }: { children: ReactNode }) {
+	const router = useRouter();
 	const userId = getUserId();
 	const messageHandlers = useRef<Map<string, Set<MessageHandler>>>(new Map());
 	const [subscribedCountry, setSubscribedCountry] = useState<Country | null>(
@@ -220,6 +222,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
 		if (!userData || userData.error) return { status: "unauthenticated" };
 		return { status: "authenticated", user: userData.user };
 	})();
+
+	useEffect(() => {
+		if (userState.status === "unauthenticated") {
+			router.push("/");
+		}
+	}, [userState.status, router]);
 
 	return (
 		<GameContext.Provider
