@@ -777,7 +777,7 @@ const app = new Elysia()
 			const updateFields: Record<string, unknown> = {
 				updatedAt: new Date(),
 			};
-			if (oilDelta !== 0 && country.name !== "United States") {
+			if (oilDelta !== 0) {
 				updateFields.oil = sql`${countryStateTable.oil} + ${oilDelta}`;
 			}
 			if (steelDelta !== 0) {
@@ -793,11 +793,6 @@ const app = new Elysia()
 				.set(updateFields)
 				.where(eq(countryStateTable.id, countryId))
 				.returning();
-
-			// United states doesn't change oil amount, but we still mark the change in the history
-			if (oilDelta !== 0 && country.name === "United States") {
-				updatedCountry.oil = country.oil + oilDelta;
-			}
 
 			// Log changes for each resource that was modified
 			const resources = [
@@ -838,6 +833,11 @@ const app = new Elysia()
 
 			let error = false;
 			for (const { type, prev, curr } of resources) {
+				// Skip US oil (we don't care if it is negative,
+				// only the difference between the values matters on the frontend)
+				if (user.country === "United States" && type === "oil") {
+					continue;
+				}
 				if (curr < 0) {
 					const updateField: Record<string, unknown> = {
 						updatedAt: new Date(),
