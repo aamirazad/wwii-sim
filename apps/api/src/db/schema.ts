@@ -139,12 +139,37 @@ export const resourceChangeLogTable = t.sqliteTable("resource_change_log", {
 		.notNull(),
 });
 
+// Announcements table for moderator messages to countries
+export const announcementsTable = t.sqliteTable("announcements", {
+	id: t.int().primaryKey({ autoIncrement: true }),
+	gameId: t
+		.int("game_id")
+		.notNull()
+		.references(() => gamesTable.id, { onDelete: "cascade" }),
+	// The announcement content (supports basic markdown)
+	content: t.text("content").notNull(),
+	// Target countries as JSON array, null means all countries
+	targetCountries: t
+		.text("target_countries", { mode: "json" })
+		.$type<PlayableCountry[] | null>(),
+	// Who created the announcement
+	createdBy: t
+		.text("created_by")
+		.notNull()
+		.references(() => usersTable.id, { onDelete: "cascade" }),
+	createdAt: t
+		.integer("created_at", { mode: "timestamp" })
+		.default(new Date())
+		.notNull(),
+});
+
 export const table = {
 	usersTable,
 	gamesTable,
 	gameStateTable,
 	countryStateTable,
 	resourceChangeLogTable,
+	announcementsTable,
 } as const;
 
 export type Table = typeof table;

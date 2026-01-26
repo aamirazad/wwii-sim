@@ -271,7 +271,7 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 	const userId = getUserId();
 	const [open, setOpen] = useState(false);
 
-	const { data: historyData, isLoading } = useQuery({
+	const { data: historyData } = useQuery({
 		queryKey: ["country-history", countryState.id],
 		queryFn: async () => {
 			if (!userId) throw new Error("Unauthenticated");
@@ -466,10 +466,13 @@ export default function GameResources() {
 	}, [subscribeToMessage, refetchCountry, queryClient]);
 
 	useEffect(() => {
-		if (gameState.status !== "has-game") {
+		if (
+			gameState.status === "no-game" ||
+			(gameState.status === "has-game" && gameState.game.status !== "active")
+		) {
 			router.push("/game/join");
 		}
-	}, [gameState.status, router]);
+	}, [gameState, router]);
 
 	if (gameState.status !== "has-game") return <LoadingSpinner />;
 

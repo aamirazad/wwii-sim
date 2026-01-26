@@ -202,9 +202,7 @@ function GameWaiting({
 										))}
 									</div>
 								)}
-								{user.country && (
-									<div>You are playing as the {user.country}</div>
-								)}
+								{user.country && <div>You are playing as {user.country}</div>}
 							</>
 						)}
 						{isAdmin && (
@@ -264,11 +262,11 @@ export default function JoinGame() {
 	// Listen for game start WebSocket message
 	useEffect(() => {
 		const unsubscribe = subscribeToMessage("server.game.started", () => {
-			router.replace("/game/resources");
+			refetchGame();
 		});
 
 		return unsubscribe;
-	}, [subscribeToMessage, router]);
+	}, [subscribeToMessage, refetchGame]);
 
 	useEffect(() => {
 		if (gameState.status === "has-game" && gameState.game.status === "active") {

@@ -5,17 +5,20 @@ import { Elysia, t } from "elysia";
 import packageJson from "../package.json";
 import { db } from "./db";
 import {
+	announcementsTable,
 	type Country,
 	countryStateTable,
 	type GameStatus,
 	gameStateTable,
 	gamesTable,
 	PLAYABLE_COUNTRIES,
+	type PlayableCountry,
 	resourceChangeLogTable,
 	type UserRole,
 	usersTable,
 } from "./db/schema";
 import {
+	AnnouncementSchema,
 	ClientMessageSchema,
 	CountrySchema,
 	CountryStateSchema,
@@ -23,6 +26,7 @@ import {
 	ErrorSchema,
 	ExtendedGameSchema,
 	GameSchema,
+	PlayableCountrySchema,
 	ResourceChangeLogSchema,
 	ServerMessageSchema,
 	UserRoleSchema,
@@ -1014,6 +1018,161 @@ const app = new Elysia()
 				summary: "Stop Game",
 				description: "Sets the game status to 'finished' (admin only).",
 				tags: ["Game"],
+			},
+		},
+	)
+	// Announcements endpoints
+	.post(
+		"/game/:gameId/announcements",
+		async ({ params, body, query, set }) => {
+			const gameId = Number.parseInt(params.gameId, 10);
+
+			// Check if user is a mod
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+
+			if (!user || user.country !== "Mods") {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only moderators can create announcements",
+				};
+			}
+
+			// Create the announcement
+			const [announcement] = await db
+				.insert(announcementsTable)
+				.values({
+					gameId,
+					content: body.content,
+					targetCountries: body.targetCountries ?? null,
+					createdBy: user.id,
+					createdAt: new Date(),
+				})
+				.returning();
+
+			const announcementData = {
+				id: announcement.id,
+				gameId: announcement.gameId,
+				content: announcement.content,
+				targetCountries: announcement.targetCountries as
+					| PlayableCountry[]
+					| null,
+				createdBy: user.name,
+				createdAt: announcement.createdAt,
+			};
+
+			// Broadcast to relevant country rooms or global
+			const wsMessage = JSON.stringify({
+				type: "server.announcement",
+				announcement: announcementData,
+			});
+
+			if (body.targetCountries && body.targetCountries.length > 0) {
+				// Send to specific country rooms
+				for (const country of body.targetCountries) {
+					app.server?.publish(`country:${country}`, wsMessage);
+				}
+				// Also send to mods room so they can see it
+				app.server?.publish("country:Mods", wsMessage);
+			} else {
+				// Send to everyone (global)
+				app.server?.publish("global", wsMessage);
+			}
+
+			return {
+				error: false as const,
+				announcement: announcementData,
+			};
+		},
+		{
+			params: t.Object({
+				gameId: t.String(),
+			}),
+			body: t.Object({
+				content: t.String(),
+				targetCountries: t.Optional(t.Array(PlayableCountrySchema)),
+			}),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					announcement: AnnouncementSchema,
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Create Announcement",
+				description: "Creates a new announcement (mod only).",
+				tags: ["Announcements"],
+			},
+		},
+	)
+	.get(
+		"/game/:gameId/announcements",
+		async ({ params, query }) => {
+			const gameId = Number.parseInt(params.gameId, 10);
+
+			// Get the user to determine which announcements they can see
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+
+			const userCountry = user?.country as Country | null;
+			const isMod = userCountry === "Mods";
+
+			// Get all announcements for this game
+			const announcements = await db
+				.select({
+					id: announcementsTable.id,
+					gameId: announcementsTable.gameId,
+					content: announcementsTable.content,
+					targetCountries: announcementsTable.targetCountries,
+					createdBy: usersTable.name,
+					createdAt: announcementsTable.createdAt,
+				})
+				.from(announcementsTable)
+				.leftJoin(usersTable, eq(announcementsTable.createdBy, usersTable.id))
+				.where(eq(announcementsTable.gameId, gameId))
+				.orderBy(sql`${announcementsTable.createdAt} DESC`);
+
+			// Filter announcements based on user's country (mods see all)
+			const filteredAnnouncements = announcements.filter((announcement) => {
+				if (isMod) return true;
+				if (!announcement.targetCountries) return true; // null = everyone
+				const targets = announcement.targetCountries as PlayableCountry[];
+				return userCountry && targets.includes(userCountry as PlayableCountry);
+			});
+
+			return {
+				error: false as const,
+				announcements: filteredAnnouncements.map((a) => ({
+					id: a.id,
+					gameId: a.gameId,
+					content: a.content,
+					targetCountries: a.targetCountries as PlayableCountry[] | null,
+					createdBy: a.createdBy ?? "Unknown",
+					createdAt: a.createdAt,
+				})),
+			};
+		},
+		{
+			params: t.Object({
+				gameId: t.String(),
+			}),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					announcements: t.Array(AnnouncementSchema),
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Get Announcements",
+				description: "Returns announcements visible to the user.",
+				tags: ["Announcements"],
 			},
 		},
 	)

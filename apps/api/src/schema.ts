@@ -52,6 +52,17 @@ export const CountrySchema = t.Union([
 	t.Literal("Mods"),
 ]);
 
+export const PlayableCountrySchema = t.Union([
+	t.Literal("Commonwealth"),
+	t.Literal("France"),
+	t.Literal("Germany"),
+	t.Literal("Italy"),
+	t.Literal("Japan"),
+	t.Literal("Russia"),
+	t.Literal("United Kingdom"),
+	t.Literal("United States"),
+]);
+
 export const ServerMessageSchema = t.Union([
 	t.Object({
 		type: t.Literal("server.connected"),
@@ -107,6 +118,16 @@ export const ServerMessageSchema = t.Union([
 	}),
 	t.Object({
 		type: t.Literal("server.game.ended"),
+	}),
+	t.Object({
+		type: t.Literal("server.announcement"),
+		announcement: t.Object({
+			id: t.Number(),
+			content: t.String(),
+			targetCountries: t.Nullable(t.Array(PlayableCountrySchema)),
+			createdBy: t.String(),
+			createdAt: t.Date(),
+		}),
 	}),
 ]);
 
@@ -267,6 +288,17 @@ export const ResourceChangeLogSchema = t.Object({
 });
 
 export type ResourceChangeLog = Static<typeof ResourceChangeLogSchema>;
+
+export const AnnouncementSchema = t.Object({
+	id: t.Number(),
+	gameId: t.Number(),
+	content: t.String(),
+	targetCountries: t.Nullable(t.Array(PlayableCountrySchema)),
+	createdBy: t.String(),
+	createdAt: t.Date(),
+});
+
+export type Announcement = Static<typeof AnnouncementSchema>;
 
 export const ErrorSchema = t.Object({
 	error: t.Literal(true),
