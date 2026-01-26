@@ -491,18 +491,16 @@ const app = new Elysia()
 				// Log initial resource values
 				const resources = ["oil", "steel", "population"] as const;
 				for (const resourceType of resources) {
-					if (countryConfig[resourceType] > 0) {
-						await db.insert(resourceChangeLogTable).values({
-							countryStateId: countryState.id,
-							gameId: newGame.id,
-							resourceType,
-							previousValue: 0,
-							newValue: countryConfig[resourceType],
-							note: "Starting amount",
-							changedBy: "system",
-							createdAt: new Date(),
-						});
-					}
+					await db.insert(resourceChangeLogTable).values({
+						countryStateId: countryState.id,
+						gameId: newGame.id,
+						resourceType,
+						previousValue: 0,
+						newValue: countryConfig[resourceType],
+						note: "Starting amount",
+						changedBy: "system",
+						createdAt: new Date(),
+					});
 				}
 
 				countryStates.push({
@@ -779,7 +777,7 @@ const app = new Elysia()
 			const updateFields: Record<string, unknown> = {
 				updatedAt: new Date(),
 			};
-			if (oilDelta !== 0) {
+			if (oilDelta !== 0 && country.name !== "United States") {
 				updateFields.oil = sql`${countryStateTable.oil} + ${oilDelta}`;
 			}
 			if (steelDelta !== 0) {
@@ -795,6 +793,11 @@ const app = new Elysia()
 				.set(updateFields)
 				.where(eq(countryStateTable.id, countryId))
 				.returning();
+
+			// United states doesn't change oil amount, but we still mark the change in the history
+			if (oilDelta !== 0 && country.name === "United States") {
+				updatedCountry.oil = country.oil + oilDelta;
+			}
 
 			// Log changes for each resource that was modified
 			const resources = [

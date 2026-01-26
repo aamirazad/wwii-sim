@@ -37,7 +37,7 @@ function ResourceCard({
 	icon,
 }: {
 	name: string;
-	value: number;
+	value: string;
 	icon: React.ReactNode;
 }) {
 	return (
@@ -50,7 +50,7 @@ function ResourceCard({
 			</CardHeader>
 			<CardContent>
 				<div className="text-4xl truncate font-bold tracking-tight">
-					{value.toLocaleString()}
+					{value}
 				</div>
 			</CardContent>
 		</Card>
@@ -179,20 +179,27 @@ function ResourceChangeForm({
 							<Input
 								id={id}
 								type="number"
+								min={-999999}
+								max={999999}
 								placeholder="+50 or -10"
 								value={value}
 								className={`transition-all  duration-200 ${Number(value) < 0 ? "text-rose-300" : "text-emerald-300"}`}
 								onChange={(e) => {
 									const v = e.target.value;
 									setValue(v);
-									setResulting(base + Number(v));
+									if (countryState.name !== "United States" || id !== "oil") {
+										setResulting(base + Number(v));
+									}
 								}}
 							/>
 							{value && (
 								<p
 									className={`text-xs transition-all truncate ${resulting < 0 ? "text-destructive font-bold" : "text-muted-foreground font-normal"}`}
 								>
-									Result: {resulting.toLocaleString()}
+									Result:{" "}
+									{countryState.name === "United States" && id === "oil"
+										? "∞"
+										: resulting.toLocaleString()}
 								</p>
 							)}
 						</div>
@@ -312,7 +319,7 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 							const logs = processedHistory[resourceType];
 							if (logs.length === 0) return null;
 
-							const startingValue = logs[0].previousValue;
+							const startingValue = logs[0].newValue;
 
 							return (
 								<div key={resourceType} className="space-y-2">
@@ -338,14 +345,17 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 												<tr className="border-t bg-muted/20">
 													<td className="px-3 py-2 text-muted-foreground">—</td>
 													<td className="px-3 py-2 font-medium">
-														{startingValue.toLocaleString()}
+														{countryState.name === "United States" &&
+														resourceType === "oil"
+															? "∞"
+															: startingValue.toLocaleString()}
 													</td>
 													<td className="px-3 py-2 text-muted-foreground italic">
 														Starting amount
 													</td>
 													<td className="px-3 py-2 text-muted-foreground">—</td>
 												</tr>
-												{logs.map((log) => {
+												{logs.slice(1).map((log) => {
 													const change = log.newValue - log.previousValue;
 													const isPositive = change > 0;
 													return (
@@ -358,7 +368,10 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 																{change.toLocaleString()}
 															</td>
 															<td className="truncate min-w-24 max-w-24 px-3 py-2 font-medium">
-																{log.newValue.toLocaleString()}
+																{countryState.name === "United States" &&
+																log.resourceType === "oil"
+																	? "∞"
+																	: log.newValue.toLocaleString()}
 															</td>
 															<td className="px-3 py-2 min-w-50 max-w-50">
 																{log.note}
@@ -461,17 +474,21 @@ export default function GameResources() {
 				<div className="flex gap-4">
 					<ResourceCard
 						name="Steel"
-						value={countryResources.steel}
+						value={countryResources.steel.toLocaleString()}
 						icon={<Hammer className="h-5 w-5" />}
 					/>
 					<ResourceCard
 						name="Oil"
-						value={countryResources.oil}
+						value={
+							countryState.name === "United States"
+								? "∞"
+								: countryResources.oil.toLocaleString()
+						}
 						icon={<Droplets className="h-5 w-5" />}
 					/>
 					<ResourceCard
 						name="Population"
-						value={countryResources.population}
+						value={countryResources.population.toLocaleString()}
 						icon={<Users className="h-5 w-5" />}
 					/>
 				</div>
