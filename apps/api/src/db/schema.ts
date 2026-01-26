@@ -22,8 +22,22 @@ export const COUNTRIES = [
 	"Russia",
 	"United Kingdom",
 	"United States",
+	"Mods",
 ] as const;
 export type Country = (typeof COUNTRIES)[number];
+
+// Countries that participate in gameplay (excludes "Mods")
+export const PLAYABLE_COUNTRIES = [
+	"Commonwealth",
+	"France",
+	"Germany",
+	"Italy",
+	"Japan",
+	"Russia",
+	"United Kingdom",
+	"United States",
+] as const;
+export type PlayableCountry = (typeof PLAYABLE_COUNTRIES)[number];
 
 export const usersTable = t.sqliteTable("users", {
 	id: t

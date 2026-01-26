@@ -9,8 +9,22 @@ export const COUNTRIES = [
 	"Russia",
 	"United Kingdom",
 	"United States",
+	"Mods",
 ] as const;
 export type Country = (typeof COUNTRIES)[number];
+
+// Countries that participate in gameplay (excludes "Mods")
+export const PLAYABLE_COUNTRIES = [
+	"Commonwealth",
+	"France",
+	"Germany",
+	"Italy",
+	"Japan",
+	"Russia",
+	"United Kingdom",
+	"United States",
+] as const;
+export type PlayableCountry = (typeof PLAYABLE_COUNTRIES)[number];
 
 export const RESOURCES = ["oil", "steel", "population"] as const;
 export type Resource = (typeof RESOURCES)[number];
@@ -35,6 +49,7 @@ export const CountrySchema = t.Union([
 	t.Literal("Russia"),
 	t.Literal("United Kingdom"),
 	t.Literal("United States"),
+	t.Literal("Mods"),
 ]);
 
 export const ServerMessageSchema = t.Union([
@@ -196,7 +211,7 @@ export const CountryConfigSchema = t.Object({
 export type CountryConfig = Static<typeof CountryConfigSchema>;
 
 export const DEFAULT_COUNTRY_STARTING_RESOURCES: Record<
-	Country,
+	PlayableCountry,
 	CountryConfig
 > = {
 	Commonwealth: { oil: 30, steel: 5, population: 10 },

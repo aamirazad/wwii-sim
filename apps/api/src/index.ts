@@ -5,12 +5,12 @@ import { Elysia, t } from "elysia";
 import packageJson from "../package.json";
 import { db } from "./db";
 import {
-	COUNTRIES,
 	type Country,
 	countryStateTable,
 	type GameStatus,
 	gameStateTable,
 	gamesTable,
+	PLAYABLE_COUNTRIES,
 	resourceChangeLogTable,
 	type UserRole,
 	usersTable,
@@ -471,9 +471,9 @@ const app = new Elysia()
 				currentYear: 1938,
 			});
 
-			// Create country states for all countries
+			// Create country states for all playable countries (not "Mods")
 			const countryStates = [];
-			for (const countryName of COUNTRIES) {
+			for (const countryName of PLAYABLE_COUNTRIES) {
 				const countryConfig = body.countries[countryName];
 				const [countryState] = await db
 					.insert(countryStateTable)
@@ -729,7 +729,21 @@ const app = new Elysia()
 			},
 		},
 	)
-	.post("/game/:gameId/next-year", async ({ params }) => {
+	.post("/game/:gameId/next-year", async ({ params, query, set }) => {
+		// Check if user is admin or mod
+		const [user] = await db
+			.select()
+			.from(usersTable)
+			.where(eq(usersTable.id, query.authorization));
+
+		if (!user || (user.role !== "admin" && user.country !== "Mods")) {
+			set.status = 403;
+			return {
+				error: true as const,
+				message: "Only admins and mods can advance the year",
+			};
+		}
+
 		const gameId = Number.parseInt(params.gameId, 10);
 		await yearScheduler.handleYearChange(
 			gameId,
@@ -759,10 +773,12 @@ const app = new Elysia()
 				.from(usersTable)
 				.where(eq(usersTable.id, query.authorization));
 
-			if (user.country !== country.name) {
+			if (user.country !== country.name && user.country !== "Mods") {
 				set.status = 403;
 				return { error: true as const, message: "Unauthorized" };
 			}
+
+			const isMod = user.country === "Mods";
 
 			const oilDelta = body.oilDelta ?? 0;
 			const steelDelta = body.steelDelta ?? 0;
@@ -835,7 +851,12 @@ const app = new Elysia()
 			for (const { type, prev, curr } of resources) {
 				// Skip US oil (we don't care if it is negative,
 				// only the difference between the values matters on the frontend)
-				if (user.country === "United States" && type === "oil") {
+				// Also skip for mods since they may be editing US resources
+				if (
+					(user.country === "United States" ||
+						(isMod && country.name === "United States")) &&
+					type === "oil"
+				) {
 					continue;
 				}
 				if (curr < 0) {
@@ -935,11 +956,11 @@ const app = new Elysia()
 				.from(usersTable)
 				.where(eq(usersTable.id, query.authorization));
 
-			if (!user || user.role !== "admin") {
+			if (!user || (user.role !== "admin" && user.country !== "Mods")) {
 				set.status = 403;
 				return {
 					error: true as const,
-					message: "Only admins can stop games",
+					message: "Only admins and mods can stop games",
 				};
 			}
 
