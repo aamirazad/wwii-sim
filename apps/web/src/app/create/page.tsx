@@ -1,11 +1,11 @@
 "use client";
 
 import {
-	COUNTRIES,
-	type Country,
 	DEFAULT_COUNTRY_STARTING_RESOURCES,
 	GAME_YEARS,
 	type GameYear,
+	PLAYABLE_COUNTRIES,
+	type PlayableCountry,
 } from "@api/schema";
 import { ChevronDownIcon } from "lucide-react";
 import { redirect, useRouter } from "next/navigation";
@@ -37,7 +37,7 @@ interface CountryConfig {
 	population: number;
 }
 
-type CountriesConfig = Record<Country, CountryConfig>;
+type CountriesConfig = Record<PlayableCountry, CountryConfig>;
 
 interface YearDurations {
 	[key: string]: number;
@@ -71,7 +71,7 @@ export default function CreateGamePage() {
 	};
 
 	const handleCountryResourceChange = (
-		country: Country,
+		country: PlayableCountry,
 		field: keyof CountryConfig,
 		value: string,
 	) => {
@@ -246,7 +246,7 @@ export default function CreateGamePage() {
 						</CardHeader>
 						<CardContent className="space-y-6">
 							<div className="grid gap-6 md:grid-cols-2">
-								{COUNTRIES.map((country) => (
+								{PLAYABLE_COUNTRIES.map((country) => (
 									<div
 										key={country}
 										className="space-y-3 rounded-lg border p-4"

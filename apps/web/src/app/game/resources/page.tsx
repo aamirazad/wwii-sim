@@ -1,6 +1,6 @@
 "use client";
 
-import type { CountryState, ResourceChangeLog } from "@api/schema";
+import type { Country, CountryState, ResourceChangeLog } from "@api/schema";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Droplets, Hammer, History, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -21,6 +21,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
 	Tooltip,
@@ -30,6 +37,18 @@ import {
 import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
 import { useGame } from "../GameContext";
+
+// Countries that mods can manage (excludes "Mods" itself)
+const PLAYABLE_COUNTRIES: Country[] = [
+	"Commonwealth",
+	"France",
+	"Germany",
+	"Italy",
+	"Japan",
+	"Russia",
+	"United Kingdom",
+	"United States",
+];
 
 function ResourceCard({
 	name,
@@ -311,8 +330,6 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 					</DialogDescription>
 				</DialogHeader>
 
-				{isLoading && <p className="text-muted-foreground">Loading...</p>}
-
 				{processedHistory && (
 					<div className="space-y-6">
 						{(["steel", "oil", "population"] as const).map((resourceType) => {
@@ -406,6 +423,15 @@ export default function GameResources() {
 
 	const userCountry =
 		userState.status === "authenticated" ? userState.user.country : null;
+	const isMod = userCountry === "Mods";
+
+	// For mods: track selected country
+	const [selectedCountry, setSelectedCountry] = useState<Country>(
+		PLAYABLE_COUNTRIES[0],
+	);
+
+	// The country to fetch data for - either user's country or mod's selected country
+	const targetCountry = isMod ? selectedCountry : userCountry;
 
 	// Query for country state (to get countryId)
 	const {
@@ -413,20 +439,20 @@ export default function GameResources() {
 		isLoading: countryLoading,
 		refetch: refetchCountry,
 	} = useQuery({
-		queryKey: ["country-state", gameState, userCountry],
+		queryKey: ["country-state", gameState, targetCountry],
 		queryFn: async () => {
-			if (!userId || gameState.status !== "has-game" || !userCountry)
+			if (!userId || gameState.status !== "has-game" || !targetCountry)
 				throw new Error("Not ready");
 			const response = await api
 				.game({ gameId: String(gameState.game.id) })
-				.country.name({ countryName: userCountry })
+				.country.name({ countryName: targetCountry })
 				.get({
 					query: { authorization: userId },
 				});
 			if (response.error) throw new Error("Failed to fetch country");
 			return response.data;
 		},
-		enabled: !!userId && gameState.status === "has-game" && !!userCountry,
+		enabled: !!userId && gameState.status === "has-game" && !!targetCountry,
 	});
 
 	// Subscribe to websocket resource updates
@@ -447,14 +473,22 @@ export default function GameResources() {
 
 	if (gameState.status !== "has-game") return <LoadingSpinner />;
 
-	if (countryLoading || !countryResources) {
-		return <CountryDashboard tab="Resources">Loading...</CountryDashboard>;
-	}
+	// For mods, we don't use countryResources from context (which would be empty for "Mods")
+	// Instead we use the countryData from the query
+	const displayResources = isMod
+		? countryData && !countryData.error
+			? {
+					oil: countryData.country.oil,
+					steel: countryData.country.steel,
+					population: countryData.country.population,
+				}
+			: null
+		: countryResources;
 
 	const countryState =
 		countryData && !countryData.error ? countryData.country : null;
 
-	if (!countryState) {
+	if (!countryState && !countryLoading) {
 		return (
 			<CountryDashboard tab="Resources">
 				<p className="text-muted-foreground">Unable to load country data.</p>
@@ -470,46 +504,76 @@ export default function GameResources() {
 	return (
 		<CountryDashboard tab="Resources">
 			<div className="space-y-8">
+				{/* Country Selector for Mods */}
+				{isMod && (
+					<div className="flex items-center gap-4">
+						<Label htmlFor="country-select" className="text-lg font-semibold">
+							Select Country:
+						</Label>
+						<Select
+							value={selectedCountry}
+							onValueChange={(value) => setSelectedCountry(value as Country)}
+						>
+							<SelectTrigger className="w-50">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{PLAYABLE_COUNTRIES.map((country) => (
+									<SelectItem key={country} value={country}>
+										{country}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+				)}
+
 				{/* Resource Cards */}
-				<div className="flex gap-4">
-					<ResourceCard
-						name="Steel"
-						value={countryResources.steel.toLocaleString()}
-						icon={<Hammer className="h-5 w-5" />}
-					/>
-					<ResourceCard
-						name="Oil"
-						value={
-							countryState.name === "United States"
-								? "∞"
-								: countryResources.oil.toLocaleString()
-						}
-						icon={<Droplets className="h-5 w-5" />}
-					/>
-					<ResourceCard
-						name="Population"
-						value={countryResources.population.toLocaleString()}
-						icon={<Users className="h-5 w-5" />}
-					/>
-				</div>
+				{displayResources && countryState && (
+					<>
+						<div className="flex gap-4">
+							<ResourceCard
+								name="Steel"
+								value={displayResources.steel.toLocaleString()}
+								icon={<Hammer className="h-5 w-5" />}
+							/>
+							<ResourceCard
+								name="Oil"
+								value={
+									countryState.name === "United States"
+										? "∞"
+										: displayResources.oil.toLocaleString()
+								}
+								icon={<Droplets className="h-5 w-5" />}
+							/>
+							<ResourceCard
+								name="Population"
+								value={displayResources.population.toLocaleString()}
+								icon={<Users className="h-5 w-5" />}
+							/>
+						</div>
 
-				{/* Resource Change Form */}
-				<Card>
-					<CardHeader>
-						<CardTitle className="text-xl">Change Resources</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<ResourceChangeForm
-							countryState={countryState}
-							onSuccess={handleChangeSuccess}
-						/>
-					</CardContent>
-				</Card>
+						{/* Resource Change Form */}
+						<Card>
+							<CardHeader>
+								<CardTitle className="text-xl">
+									Change Resources{isMod ? ` for ${countryState.name}` : ""}
+								</CardTitle>
+							</CardHeader>
+							<CardContent>
+								<ResourceChangeForm
+									countryState={countryState}
+									onSuccess={handleChangeSuccess}
+								/>
+							</CardContent>
+						</Card>
 
-				{/* History Button */}
-				<div className="flex justify-end">
-					<HistoryDialog countryState={countryState} />
-				</div>
+						{/* History Button */}
+						<div className="flex justify-end">
+							<HistoryDialog countryState={countryState} />
+						</div>
+					</>
+				)}
 			</div>
 		</CountryDashboard>
 	);

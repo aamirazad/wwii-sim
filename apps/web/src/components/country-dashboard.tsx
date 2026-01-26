@@ -3,10 +3,10 @@
 import {
 	ClockPlus,
 	Dices,
+	Megaphone,
 	MoveRight,
 	Pickaxe,
 	Square,
-	Swords,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -114,9 +114,12 @@ export default function CountryDashboard({
 
 	const isAdmin =
 		userState.status === "authenticated" && userState.user.role === "admin";
+	const isMod =
+		userState.status === "authenticated" && userState.user.country === "Mods";
 
 	const handleStopGame = async () => {
-		if (!userId || !isAdmin || gameState.status !== "has-game") return;
+		if (!userId || (!isAdmin && !isMod) || gameState.status !== "has-game")
+			return;
 
 		setIsStopping(true);
 		try {
@@ -142,7 +145,8 @@ export default function CountryDashboard({
 	};
 
 	const handleTriggerNewYear = async () => {
-		if (!userId || !isAdmin || gameState.status !== "has-game") return;
+		if (!userId || (!isAdmin && !isMod) || gameState.status !== "has-game")
+			return;
 		setNewYearOpen(false);
 
 		await api
@@ -157,9 +161,9 @@ export default function CountryDashboard({
 			href: "/game/resources",
 		},
 		{
-			icon: <Swords size={24} />,
-			label: "Battles",
-			href: "/game/battles",
+			icon: <Megaphone size={24} />,
+			label: "Message Board",
+			href: "/game/announcements",
 		},
 		{
 			icon: <Dices size={24} />,
@@ -185,7 +189,7 @@ export default function CountryDashboard({
 				</div>
 
 				<div className="flex items-center gap-3">
-					{isAdmin && gameState.status === "has-game" && (
+					{(isAdmin || isMod) && gameState.status === "has-game" && (
 						<>
 							{currentYear && (
 								<AlertDialog open={newYearOpen} onOpenChange={setNewYearOpen}>
