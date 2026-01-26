@@ -3,6 +3,7 @@
 <details>
 <summary>All commits</summary>
 
+- **Other**: slow website loading due to client side loaded background ([#61](https://github.com/aamirazad/wwii-sim/pull/61)) by [@aamirazad](https://github.com/aamirazad) - [`93e4a2d...88d35c8`](https://github.com/aamirazad/wwii-sim/compare/93e4a2d...88d35c8)
 - **Feature**: united states unlimited oil ([#60](https://github.com/aamirazad/wwii-sim/pull/60)) by [@aamirazad](https://github.com/aamirazad) - [`bf8489a...dfce793`](https://github.com/aamirazad/wwii-sim/compare/bf8489a...dfce793)
 - **Feature**: prevent negatives with the delta system ([#59](https://github.com/aamirazad/wwii-sim/pull/59)) by [@aamirazad](https://github.com/aamirazad) - [`a7454c8...990da61`](https://github.com/aamirazad/wwii-sim/compare/a7454c8...990da61)
 - **Fix**: resource change race condition ([#58](https://github.com/aamirazad/wwii-sim/pull/58)) by [@aamirazad](https://github.com/aamirazad) - [`e2c3222...22f590e`](https://github.com/aamirazad/wwii-sim/compare/e2c3222...22f590e)
