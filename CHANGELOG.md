@@ -3,6 +3,7 @@
 <details>
 <summary>All commits</summary>
 
+- **Fix**: redirect unauthenticated on game pages ([#63](https://github.com/aamirazad/wwii-sim/pull/63)) by [@aamirazad](https://github.com/aamirazad) - [`aaceb52...56c9a3f`](https://github.com/aamirazad/wwii-sim/compare/aaceb52...56c9a3f)
 - **Feature**: message board ([#62](https://github.com/aamirazad/wwii-sim/pull/62)) by [@aamirazad](https://github.com/aamirazad) - [`ffa45d5...c3bdd91`](https://github.com/aamirazad/wwii-sim/compare/ffa45d5...c3bdd91)
 - **Other**: slow website loading due to client side loaded background ([#61](https://github.com/aamirazad/wwii-sim/pull/61)) by [@aamirazad](https://github.com/aamirazad) - [`93e4a2d...88d35c8`](https://github.com/aamirazad/wwii-sim/compare/93e4a2d...88d35c8)
 - **Feature**: united states unlimited oil ([#60](https://github.com/aamirazad/wwii-sim/pull/60)) by [@aamirazad](https://github.com/aamirazad) - [`bf8489a...dfce793`](https://github.com/aamirazad/wwii-sim/compare/bf8489a...dfce793)
