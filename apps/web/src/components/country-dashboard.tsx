@@ -24,6 +24,11 @@ import {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
 
@@ -194,7 +199,12 @@ export default function CountryDashboard({
 							{currentYear && (
 								<AlertDialog open={newYearOpen} onOpenChange={setNewYearOpen}>
 									<AlertDialogTrigger className="p-2 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-										<ClockPlus size={20} />
+										<Tooltip>
+											<TooltipTrigger render={<ClockPlus size={20} />} />
+											<TooltipContent>
+												<p>New year</p>
+											</TooltipContent>
+										</Tooltip>
 									</AlertDialogTrigger>
 									<AlertDialogContent>
 										<AlertDialogHeader>
@@ -220,7 +230,14 @@ export default function CountryDashboard({
 									disabled={isStopping}
 									className="p-2 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 								>
-									<Square fill="#fb2c36" size={20} />
+									<Tooltip>
+										<TooltipTrigger
+											render={<Square fill="#fb2c36" size={20} />}
+										/>
+										<TooltipContent>
+											<p>End Game</p>
+										</TooltipContent>
+									</Tooltip>
 								</AlertDialogTrigger>
 								<AlertDialogContent>
 									<AlertDialogHeader>
