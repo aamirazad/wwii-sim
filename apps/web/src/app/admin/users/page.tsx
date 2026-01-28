@@ -290,7 +290,6 @@ export default function AdminUsersPage() {
 								<SelectContent>
 									<SelectItem value="player">Player</SelectItem>
 									<SelectItem value="admin">Admin</SelectItem>
-									<SelectItem value="spectator">Spectator</SelectItem>
 								</SelectContent>
 							</Select>
 						</div>
