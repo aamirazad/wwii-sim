@@ -24,7 +24,7 @@ function ServerOffline() {
 			<Alert variant="destructive" className="max-w-md">
 				<AlertTitle>Server Unavailable</AlertTitle>
 				<AlertDescription>
-					The server is currently off. Please let Aamir know if you think this
+					The server is down right now. Please let Aamir know if you think this
 					is a mistake.
 				</AlertDescription>
 			</Alert>
