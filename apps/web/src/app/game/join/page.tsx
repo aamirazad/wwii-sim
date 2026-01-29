@@ -11,6 +11,11 @@ import LoadingSpinner from "@/components/loading-spinner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useGame } from "../GameContext";
 
 function ServerOffline() {
@@ -133,16 +138,20 @@ function GameWaiting({
 								: "Game Starting Soon"}
 						</CardTitle>
 						<div className="flex items-center gap-2">
-							<span
-								className={`h-3 w-3 rounded-full ${connectionDotColor}`}
-								title={
-									connectionStatus === "connected"
+							<Tooltip>
+								<TooltipTrigger>
+									<div
+										className={`size-2 rounded-full ${connectionDotColor}`}
+									/>
+								</TooltipTrigger>
+								<TooltipContent>
+									{connectionStatus === "connected"
 										? "Connected"
 										: connectionStatus === "connecting"
 											? "Connecting..."
-											: "Disconnected"
-								}
-							/>
+											: "Disconnected"}
+								</TooltipContent>
+							</Tooltip>
 						</div>
 					</div>
 				</CardHeader>

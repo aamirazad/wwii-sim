@@ -1,29 +1,13 @@
 "use client";
 
-import {
-	ClockPlus,
-	Dices,
-	Megaphone,
-	MoveRight,
-	Pickaxe,
-	Square,
-} from "lucide-react";
+import { Dices, Megaphone, MoveRight, Pickaxe } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useGame } from "@/app/game/GameContext";
+import AdminMenuSelector from "@/components/admin-selector";
 import Dock from "@/components/dock";
 import ExternalLink from "@/components/external-link";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-	AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+
 import {
 	Tooltip,
 	TooltipContent,
@@ -51,9 +35,7 @@ export default function CountryDashboard({
 		subscribeToMessage,
 	} = useGame();
 	const commitHash = process.env.NEXT_PUBLIC_COMMIT_SHA?.substring(0, 7);
-	const [isStopping, setIsStopping] = useState(false);
 	const [currentYear, setCurrentYear] = useState<number | null>(null);
-	const [newYearOpen, setNewYearOpen] = useState(false);
 
 	const userId = getUserId();
 	const router = useRouter();
@@ -126,7 +108,6 @@ export default function CountryDashboard({
 		if (!userId || (!isAdmin && !isMod) || gameState.status !== "has-game")
 			return;
 
-		setIsStopping(true);
 		try {
 			const response = await api
 				.game({ gameId: gameState.game.id.toString() })
@@ -144,15 +125,12 @@ export default function CountryDashboard({
 		} catch (error) {
 			console.error("Error stopping game:", error);
 			alert("An error occurred while stopping the game");
-		} finally {
-			setIsStopping(false);
 		}
 	};
 
 	const handleTriggerNewYear = async () => {
 		if (!userId || (!isAdmin && !isMod) || gameState.status !== "has-game")
 			return;
-		setNewYearOpen(false);
 
 		await api
 			.game({ gameId: gameState.game.id.toString() })
@@ -195,84 +173,27 @@ export default function CountryDashboard({
 
 				<div className="flex items-center gap-3">
 					{(isAdmin || isMod) && gameState.status === "has-game" && (
-						<>
-							{currentYear && (
-								<AlertDialog open={newYearOpen} onOpenChange={setNewYearOpen}>
-									<AlertDialogTrigger className="p-2 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-										<Tooltip>
-											<TooltipTrigger render={<ClockPlus size={20} />} />
-											<TooltipContent>
-												<p>New year</p>
-											</TooltipContent>
-										</Tooltip>
-									</AlertDialogTrigger>
-									<AlertDialogContent>
-										<AlertDialogHeader>
-											<AlertDialogTitle>
-												Manually Trigger New Year?
-											</AlertDialogTitle>
-											<AlertDialogDescription>
-												This will immediately change the year to{" "}
-												{currentYear + 1}.
-											</AlertDialogDescription>
-										</AlertDialogHeader>
-										<AlertDialogFooter>
-											<AlertDialogCancel>Cancel</AlertDialogCancel>
-											<AlertDialogAction onClick={handleTriggerNewYear}>
-												Trigger New Year
-											</AlertDialogAction>
-										</AlertDialogFooter>
-									</AlertDialogContent>
-								</AlertDialog>
-							)}
-							<AlertDialog>
-								<AlertDialogTrigger
-									disabled={isStopping}
-									className="p-2 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-								>
-									<Tooltip>
-										<TooltipTrigger
-											render={<Square fill="#fb2c36" size={20} />}
-										/>
-										<TooltipContent>
-											<p>End Game</p>
-										</TooltipContent>
-									</Tooltip>
-								</AlertDialogTrigger>
-								<AlertDialogContent>
-									<AlertDialogHeader>
-										<AlertDialogTitle>End Game?</AlertDialogTitle>
-										<AlertDialogDescription>
-											This will immediately end the game for everyone and show
-											the game summary page.
-										</AlertDialogDescription>
-									</AlertDialogHeader>
-									<AlertDialogFooter>
-										<AlertDialogCancel>Cancel</AlertDialogCancel>
-										<AlertDialogAction
-											variant={"destructive"}
-											onClick={handleStopGame}
-										>
-											End Game
-										</AlertDialogAction>
-									</AlertDialogFooter>
-								</AlertDialogContent>
-							</AlertDialog>
-						</>
+						<AdminMenuSelector
+							currentYear={currentYear}
+							handleTriggerNewYear={handleTriggerNewYear}
+							handleStopGame={handleStopGame}
+						/>
 					)}
 					<p className="text-3xl font-mono font-bold text-white drop-shadow-lg">
 						{currentYear}
 					</p>
-					<div
-						className={`h-2 w-2 rounded-full ${connectionDotColor}`}
-						title={
-							connectionStatus === "connected"
+					<Tooltip>
+						<TooltipTrigger>
+							<div className={`size-2 rounded-full ${connectionDotColor}`} />
+						</TooltipTrigger>
+						<TooltipContent>
+							{connectionStatus === "connected"
 								? "Connected"
 								: connectionStatus === "connecting"
 									? "Connecting..."
-									: "Disconnected"
-						}
-					/>
+									: "Disconnected"}
+						</TooltipContent>
+					</Tooltip>
 				</div>
 			</header>
 			<div className="mx-6 grow flex backdrop-brightness-50 backdrop-blur-3xl border border-white/10 rounded-xl shadow-2xl overflow-hidden relative">
