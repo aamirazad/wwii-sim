@@ -23,13 +23,13 @@ import useWebSocket, { ReadyState } from "react-use-websocket";
 import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
 
-type GameState =
+export type GameState =
 	| { status: "loading" }
 	| { status: "error"; message: string }
 	| { status: "no-game" }
 	| { status: "has-game"; game: ExtendedGame };
 
-type UserState =
+export type UserState =
 	| { status: "loading" }
 	| { status: "error"; message: string }
 	| { status: "unauthenticated" }

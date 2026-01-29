@@ -149,9 +149,6 @@ export function NewYearDialog() {
 							>
 								New Year!
 							</h2>
-							<p id="new-year-desc" className="text-sm text-white/90">
-								Your nation grows stronger.
-							</p>
 						</div>
 					</div>
 

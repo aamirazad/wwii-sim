@@ -3,7 +3,6 @@
 import type { Country, CountryState, ResourceChangeLog } from "@api/schema";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Droplets, Hammer, History, Users } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 import CountryDashboard from "@/components/country-dashboard";
 import LoadingSpinner from "@/components/loading-spinner";
@@ -34,6 +33,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useGamePageGuard } from "@/hooks/useGamePageGuard";
 import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
 import { useGame } from "../GameContext";
@@ -417,7 +417,6 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 export default function GameResources() {
 	const { gameState, userState, countryResources, subscribeToMessage } =
 		useGame();
-	const router = useRouter();
 	const userId = getUserId();
 	const queryClient = useQueryClient();
 
@@ -465,14 +464,12 @@ export default function GameResources() {
 		return unsubscribe;
 	}, [subscribeToMessage, refetchCountry, queryClient]);
 
-	useEffect(() => {
-		if (
-			gameState.status === "no-game" ||
-			(gameState.status === "has-game" && gameState.game.status !== "active")
-		) {
-			router.push("/game/join");
-		}
-	}, [gameState, router]);
+	// Guard: requires active game (mods always have access)
+	useGamePageGuard({
+		requires: "active-game",
+		gameState,
+		userState,
+	});
 
 	if (gameState.status !== "has-game") return <LoadingSpinner />;
 

@@ -1021,6 +1021,155 @@ const app = new Elysia()
 			},
 		},
 	)
+	.patch(
+		"/game/:gameId/pause",
+		async ({ params, query, set }) => {
+			// Check if user is admin or mod
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+
+			if (!user || (user.role !== "admin" && user.country !== "Mods")) {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only admins and mods can pause games",
+				};
+			}
+
+			const gameId = Number.parseInt(params.gameId, 10);
+
+			// Check if game exists
+			const [game] = await db
+				.select()
+				.from(gamesTable)
+				.where(eq(gamesTable.id, gameId));
+
+			if (!game) {
+				set.status = 404;
+				return { error: true as const, message: "Game not found" };
+			}
+
+			// Update game status to paused
+			await db
+				.update(gamesTable)
+				.set({ status: "paused" })
+				.where(eq(gamesTable.id, gameId));
+
+			// Clear any scheduled year changes for this game
+			yearScheduler.clearGameSchedules(gameId);
+
+			// Broadcast game paused to all clients
+			app.server?.publish(
+				"global",
+				JSON.stringify({
+					type: "server.game.paused",
+				}),
+			);
+
+			return {
+				error: false as const,
+				message: "Game paused successfully",
+			};
+		},
+		{
+			params: t.Object({
+				gameId: t.String(),
+			}),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					message: t.String(),
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Pause Game",
+				description: "Sets the game status to 'paused' (admin/mod only).",
+				tags: ["Game"],
+			},
+		},
+	)
+	.patch(
+		"/game/:gameId/unpause",
+		async ({ params, query, set }) => {
+			// Check if user is admin or mod
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+
+			if (!user || (user.role !== "admin" && user.country !== "Mods")) {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only admins and mods can unpause games",
+				};
+			}
+
+			const gameId = Number.parseInt(params.gameId, 10);
+
+			// Check if game exists and is paused
+			const [game] = await db
+				.select()
+				.from(gamesTable)
+				.where(eq(gamesTable.id, gameId));
+
+			if (!game) {
+				set.status = 404;
+				return { error: true as const, message: "Game not found" };
+			}
+
+			if (game.status !== "paused") {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: "Game is not currently paused",
+				};
+			}
+
+			// Update game status to active
+			await db
+				.update(gamesTable)
+				.set({ status: "active" })
+				.where(eq(gamesTable.id, gameId));
+
+			// Reschedule year changes for this game
+			await yearScheduler.scheduleGameYears(gameId);
+
+			// Broadcast game unpaused to all clients
+			app.server?.publish(
+				"global",
+				JSON.stringify({
+					type: "server.game.unpaused",
+				}),
+			);
+
+			return {
+				error: false as const,
+				message: "Game unpaused successfully",
+			};
+		},
+		{
+			params: t.Object({
+				gameId: t.String(),
+			}),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					message: t.String(),
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Unpause Game",
+				description:
+					"Sets the game status back to 'active' and resumes year scheduling (admin/mod only).",
+				tags: ["Game"],
+			},
+		},
+	)
 	// Announcements endpoints
 	.post(
 		"/game/:gameId/announcements",
