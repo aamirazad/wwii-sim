@@ -344,11 +344,6 @@ function UserCard({
 				<CardDescription>@{user.username}</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
-				<div className="text-sm">
-					<p className="text-muted-foreground">User ID</p>
-					<p className="font-mono text-xs">{user.id}</p>
-				</div>
-
 				<Button variant="outline" size="sm" onClick={copyLoginLink}>
 					{copy ? <Check /> : <Copy className="mr-2 h-4 w-4" />}
 					Copy login link
