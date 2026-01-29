@@ -16,6 +16,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useGamePageGuard } from "@/hooks/useGamePageGuard";
 import { useGame } from "../GameContext";
 
 function ServerOffline() {
@@ -257,7 +258,13 @@ export default function JoinGame() {
 		sendMessage,
 		refetchGame,
 	} = useGame();
-	const router = useRouter();
+
+	// Guard: requires waiting game (redirects active/paused games appropriately)
+	useGamePageGuard({
+		requires: "waiting-game",
+		gameState,
+		userState,
+	});
 
 	// Poll for game status updates while on waiting screen
 	useEffect(() => {
@@ -276,12 +283,6 @@ export default function JoinGame() {
 
 		return unsubscribe;
 	}, [subscribeToMessage, refetchGame]);
-
-	useEffect(() => {
-		if (gameState.status === "has-game" && gameState.game.status === "active") {
-			router.replace("/game/resources");
-		}
-	}, [gameState, router]);
 
 	if (gameState.status === "loading" || userState.status === "loading") {
 		return <LoadingSpinner />;
@@ -313,4 +314,6 @@ export default function JoinGame() {
 			/>
 		);
 	}
+
+	return <LoadingSpinner />;
 }

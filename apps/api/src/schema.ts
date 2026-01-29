@@ -120,6 +120,12 @@ export const ServerMessageSchema = t.Union([
 		type: t.Literal("server.game.ended"),
 	}),
 	t.Object({
+		type: t.Literal("server.game.paused"),
+	}),
+	t.Object({
+		type: t.Literal("server.game.unpaused"),
+	}),
+	t.Object({
 		type: t.Literal("server.announcement"),
 		announcement: t.Object({
 			id: t.Number(),
