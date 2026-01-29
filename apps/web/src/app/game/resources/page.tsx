@@ -118,6 +118,12 @@ function ResourceChangeForm({
 			return;
 		}
 
+		if (anyNegative) {
+			setError("Resulting resources cannot be negative");
+			setIsSubmitting(false);
+			return;
+		}
+
 		try {
 			const response = await api
 				.game({ gameId: String(countryState.gameId) })
@@ -245,22 +251,15 @@ function ResourceChangeForm({
 			<Tooltip>
 				<TooltipTrigger
 					render={
-						<Button
-							type="submit"
-							disabled={isSubmitting || !note.trim() || anyNegative}
-						>
+						<Button type="submit">
 							{isSubmitting ? "Submitting..." : "Submit Change"}
 						</Button>
 					}
 				></TooltipTrigger>
-				<TooltipContent>
-					{anyNegative ? (
-						"Resulting amounts cannot be negative"
-					) : (
-						<KbdGroup>
-							<Kbd>Ctrl</Kbd>+<Kbd>Enter</Kbd>
-						</KbdGroup>
-					)}
+				<TooltipContent side="bottom">
+					<KbdGroup>
+						<Kbd>Ctrl</Kbd>+<Kbd>Enter</Kbd>
+					</KbdGroup>
 				</TooltipContent>
 			</Tooltip>
 		</form>
