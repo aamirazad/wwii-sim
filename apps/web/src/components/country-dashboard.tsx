@@ -1,6 +1,7 @@
 "use client";
 
 import {
+	CalendarClock,
 	CirclePause,
 	CirclePlay,
 	CircleX,
@@ -343,10 +344,10 @@ export default function CountryDashboard({
 										}
 									>
 										<Grip className="size-6 text-foreground/70" />
-										<span className="sr-only">Admin Menu</span>
+										<span className="sr-only">Mod Menu</span>
 									</TooltipTrigger>
 									<TooltipContent>
-										<p>Admin Menu</p>
+										<p>Mod Menu</p>
 									</TooltipContent>
 								</Tooltip>
 								<PopoverContent className="w-auto p-2" align="end">
@@ -431,6 +432,22 @@ export default function CountryDashboard({
 												</DialogFooter>
 											</DialogContent>
 										</Dialog>
+										<Button
+											nativeButton={false}
+											variant="ghost"
+											className="h-16 w-16 flex flex-col items-center justify-center gap-1.5 p-2 hover:bg-muted/80 bg-transparent border-0 rounded-lg transition-colors"
+											render={
+												<Link href="/game/schedule" className="no-underline" />
+											}
+										>
+											<CalendarClock
+												className="h-5 w-5 text-foreground/70 shrink-0"
+												strokeWidth={1.5}
+											/>
+											<span className="text-[10px] font-medium text-center text-foreground/80 leading-tight">
+												Schedule
+											</span>
+										</Button>
 									</div>
 								</PopoverContent>
 							</Popover>

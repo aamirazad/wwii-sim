@@ -23,6 +23,7 @@ export function NewYearDialog() {
 		const unsubscribe = subscribeToMessage("server.year.changed", (msg) => {
 			if (msg.type === "server.year.changed") {
 				setNewYear(msg.year);
+
 				setChanges(msg.resourceChanges);
 				setOpen(true);
 				setCanClose(false);

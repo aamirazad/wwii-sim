@@ -163,6 +163,28 @@ export const announcementsTable = t.sqliteTable("announcements", {
 		.notNull(),
 });
 
+// Year schedules table for persistent year change scheduling
+export const yearSchedulesTable = t.sqliteTable("year_schedules", {
+	id: t.int().primaryKey({ autoIncrement: true }),
+	gameId: t
+		.int("game_id")
+		.notNull()
+		.references(() => gamesTable.id, { onDelete: "cascade" }),
+	// The year to change to when triggered
+	scheduledYear: t.int("scheduled_year").notNull(),
+	// When this year change should occur
+	scheduledTime: t.integer("scheduled_time", { mode: "timestamp" }).notNull(),
+	// Who created this schedule
+	createdBy: t
+		.text("created_by")
+		.notNull()
+		.references(() => usersTable.id, { onDelete: "cascade" }),
+	createdAt: t
+		.integer("created_at", { mode: "timestamp" })
+		.default(new Date())
+		.notNull(),
+});
+
 export const table = {
 	usersTable,
 	gamesTable,
@@ -170,6 +192,7 @@ export const table = {
 	countryStateTable,
 	resourceChangeLogTable,
 	announcementsTable,
+	yearSchedulesTable,
 } as const;
 
 export type Table = typeof table;

@@ -1,0 +1,509 @@
+{
+	"version": "6",
+	"dialect": "sqlite",
+	"id": "a8030418-594e-42ae-a490-32edb01d1bbf",
+	"prevId": "9418ea37-8ed0-4c38-a1f9-26bb89413599",
+	"tables": {
+		"announcements": {
+			"name": "announcements",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "integer",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": true
+				},
+				"game_id": {
+					"name": "game_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"content": {
+					"name": "content",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"target_countries": {
+					"name": "target_countries",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'\"2026-01-30T01:52:33.855Z\"'"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"announcements_game_id_games_id_fk": {
+					"name": "announcements_game_id_games_id_fk",
+					"tableFrom": "announcements",
+					"tableTo": "games",
+					"columnsFrom": ["game_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				},
+				"announcements_created_by_users_id_fk": {
+					"name": "announcements_created_by_users_id_fk",
+					"tableFrom": "announcements",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"country_state": {
+			"name": "country_state",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "integer",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": true
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"game_id": {
+					"name": "game_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"oil": {
+					"name": "oil",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": 0
+				},
+				"steel": {
+					"name": "steel",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": 0
+				},
+				"population": {
+					"name": "population",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": 0
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'\"2026-01-30T01:52:33.855Z\"'"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'\"2026-01-30T01:52:33.855Z\"'"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"country_state_game_id_games_id_fk": {
+					"name": "country_state_game_id_games_id_fk",
+					"tableFrom": "country_state",
+					"tableTo": "games",
+					"columnsFrom": ["game_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"game_state": {
+			"name": "game_state",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "integer",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": true
+				},
+				"game_id": {
+					"name": "game_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"current_year": {
+					"name": "current_year",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": 1938
+				},
+				"data": {
+					"name": "data",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'\"2026-01-30T01:52:33.855Z\"'"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"game_state_game_id_games_id_fk": {
+					"name": "game_state_game_id_games_id_fk",
+					"tableFrom": "game_state",
+					"tableTo": "games",
+					"columnsFrom": ["game_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"games": {
+			"name": "games",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "integer",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": true
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false,
+					"default": "'waiting'"
+				},
+				"start_date": {
+					"name": "start_date",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"year_durations": {
+					"name": "year_durations",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'\"2026-01-30T01:52:33.854Z\"'"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"resource_change_log": {
+			"name": "resource_change_log",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "integer",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": true
+				},
+				"country_state_id": {
+					"name": "country_state_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"game_id": {
+					"name": "game_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"resource_type": {
+					"name": "resource_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"previous_value": {
+					"name": "previous_value",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"new_value": {
+					"name": "new_value",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"note": {
+					"name": "note",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"changed_by": {
+					"name": "changed_by",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'\"2026-01-30T01:52:33.855Z\"'"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"resource_change_log_country_state_id_country_state_id_fk": {
+					"name": "resource_change_log_country_state_id_country_state_id_fk",
+					"tableFrom": "resource_change_log",
+					"tableTo": "country_state",
+					"columnsFrom": ["country_state_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				},
+				"resource_change_log_game_id_games_id_fk": {
+					"name": "resource_change_log_game_id_games_id_fk",
+					"tableFrom": "resource_change_log",
+					"tableTo": "games",
+					"columnsFrom": ["game_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				},
+				"resource_change_log_changed_by_users_id_fk": {
+					"name": "resource_change_log_changed_by_users_id_fk",
+					"tableFrom": "resource_change_log",
+					"tableTo": "users",
+					"columnsFrom": ["changed_by"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"users": {
+			"name": "users",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"username": {
+					"name": "username",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"email": {
+					"name": "email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"role": {
+					"name": "role",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"country": {
+					"name": "country",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'\"2026-01-30T01:52:33.854Z\"'"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"year_schedules": {
+			"name": "year_schedules",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "integer",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": true
+				},
+				"game_id": {
+					"name": "game_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"scheduled_year": {
+					"name": "scheduled_year",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"scheduled_time": {
+					"name": "scheduled_time",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'\"2026-01-30T01:52:33.855Z\"'"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"year_schedules_game_id_games_id_fk": {
+					"name": "year_schedules_game_id_games_id_fk",
+					"tableFrom": "year_schedules",
+					"tableTo": "games",
+					"columnsFrom": ["game_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				},
+				"year_schedules_created_by_users_id_fk": {
+					"name": "year_schedules_created_by_users_id_fk",
+					"tableFrom": "year_schedules",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		}
+	},
+	"views": {},
+	"enums": {},
+	"_meta": {
+		"schemas": {},
+		"tables": {},
+		"columns": {}
+	},
+	"internal": {
+		"indexes": {}
+	}
+}

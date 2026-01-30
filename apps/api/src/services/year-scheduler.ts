@@ -1,4 +1,4 @@
-import { eq, or } from "drizzle-orm";
+import { and, eq, gt, or } from "drizzle-orm";
 import type { App } from "..";
 import { db } from "../db";
 import {
@@ -7,12 +7,14 @@ import {
 	gameStateTable,
 	gamesTable,
 	resourceChangeLogTable,
+	yearSchedulesTable,
 } from "../db/schema";
 import type { YearDurations } from "../schema";
 
 const GAME_YEARS = [1938, 1939, 1940, 1941, 1942, 1943, 1944] as const;
 
 interface ScheduledYearChange {
+	scheduleId: number;
 	gameId: number;
 	year: number;
 	timeout: NodeJS.Timeout;
@@ -54,9 +56,66 @@ class YearScheduler {
 	}
 
 	/**
-	 * Schedule all year changes for a game
+	 * Schedule all year changes for a game from database
 	 */
 	async scheduleGameYears(gameId: number) {
+		// Clear any existing in-memory schedules for this game
+		this.clearGameSchedules(gameId);
+
+		// Load schedules from database
+		const dbSchedules = await db
+			.select()
+			.from(yearSchedulesTable)
+			.where(
+				and(
+					eq(yearSchedulesTable.gameId, gameId),
+					gt(yearSchedulesTable.scheduledTime, new Date()),
+				),
+			);
+
+		// Get current game state to filter out past years
+		const [gameState] = await db
+			.select()
+			.from(gameStateTable)
+			.where(eq(gameStateTable.gameId, gameId));
+
+		const currentYear = gameState?.currentYear ?? 1938;
+		const scheduledChanges: ScheduledYearChange[] = [];
+		const now = Date.now();
+
+		for (const schedule of dbSchedules) {
+			const delay = schedule.scheduledTime.getTime() - now;
+
+			// Only schedule future year changes that are greater than current year
+			if (delay > 0 && schedule.scheduledYear > currentYear) {
+				const timeout = setTimeout(() => {
+					this.handleYearChange(gameId, schedule.scheduledYear);
+				}, delay);
+
+				scheduledChanges.push({
+					scheduleId: schedule.id,
+					gameId,
+					year: schedule.scheduledYear,
+					timeout,
+				});
+
+				console.log(
+					`Scheduled year change to ${schedule.scheduledYear} for game ${gameId} at ${schedule.scheduledTime.toISOString()} (in ${Math.round(delay / 1000)}s)`,
+				);
+			}
+		}
+
+		// Store new schedules
+		this.scheduledChanges.set(gameId, scheduledChanges);
+	}
+
+	/**
+	 * Initialize year schedules from game year durations (for new games)
+	 */
+	async initializeGameSchedulesFromDurations(
+		gameId: number,
+		createdBy: string,
+	) {
 		// Get game details
 		const [game] = await db
 			.select()
@@ -68,58 +127,162 @@ class YearScheduler {
 			return;
 		}
 
-		// Get or create game state
-		let [gameState] = await db
-			.select()
-			.from(gameStateTable)
-			.where(eq(gameStateTable.gameId, gameId));
-
-		if (!gameState) {
-			[gameState] = await db
-				.insert(gameStateTable)
-				.values({
-					gameId,
-					currentYear: 1938,
-					data: null,
-					updatedAt: new Date(),
-				})
-				.returning();
-		}
-
 		const schedule = this.calculateYearSchedule(
 			game.startDate,
 			game.yearDurations as YearDurations,
 		);
 
-		const scheduledChanges: ScheduledYearChange[] = [];
-		const now = Date.now();
-
+		// Insert schedules into database
 		for (const [year, changeTime] of schedule.entries()) {
-			const delay = changeTime.getTime() - now;
+			await db.insert(yearSchedulesTable).values({
+				gameId,
+				scheduledYear: year,
+				scheduledTime: changeTime,
+				createdBy,
+				createdAt: new Date(),
+			});
+		}
 
-			// Only schedule future year changes
-			if (delay > 0 && year > gameState.currentYear) {
-				const timeout = setTimeout(() => {
-					this.handleYearChange(gameId, year);
-				}, delay);
+		// Now schedule them in memory
+		await this.scheduleGameYears(gameId);
+	}
 
-				scheduledChanges.push({
-					gameId,
-					year,
-					timeout,
-				});
+	/**
+	 * Add a new year schedule
+	 */
+	async addSchedule(
+		gameId: number,
+		scheduledYear: number,
+		scheduledTime: Date,
+		createdBy: string,
+	): Promise<{ id: number } | { error: string }> {
+		// Validate scheduled time is in the future
+		if (scheduledTime.getTime() <= Date.now()) {
+			return { error: "Scheduled time must be in the future" };
+		}
 
-				console.log(
-					`Scheduled year change to ${year} for game ${gameId} at ${changeTime.toISOString()} (in ${Math.round(delay / 1000)}s)`,
-				);
+		// Validate year is reasonable
+		const currentYear = await this.getCurrentYear(gameId);
+		if (scheduledYear <= currentYear) {
+			return { error: "Scheduled year must be greater than current year" };
+		}
+
+		// Insert into database
+		const [inserted] = await db
+			.insert(yearSchedulesTable)
+			.values({
+				gameId,
+				scheduledYear,
+				scheduledTime,
+				createdBy,
+				createdAt: new Date(),
+			})
+			.returning({ id: yearSchedulesTable.id });
+
+		// Reschedule to pick up the new entry
+		await this.scheduleGameYears(gameId);
+
+		return { id: inserted.id };
+	}
+
+	/**
+	 * Remove a year schedule
+	 */
+	async removeSchedule(
+		scheduleId: number,
+		gameId: number,
+	): Promise<{ success: boolean } | { error: string }> {
+		// Delete from database
+		const deleted = await db
+			.delete(yearSchedulesTable)
+			.where(
+				and(
+					eq(yearSchedulesTable.id, scheduleId),
+					eq(yearSchedulesTable.gameId, gameId),
+				),
+			)
+			.returning();
+
+		if (deleted.length === 0) {
+			return { error: "Schedule not found" };
+		}
+
+		// Reschedule to remove the deleted entry from memory
+		await this.scheduleGameYears(gameId);
+
+		return { success: true };
+	}
+
+	/**
+	 * Update a year schedule
+	 */
+	async updateSchedule(
+		scheduleId: number,
+		gameId: number,
+		updates: { scheduledYear?: number; scheduledTime?: Date },
+	): Promise<{ success: boolean } | { error: string }> {
+		// Validate if updating time
+		if (
+			updates.scheduledTime &&
+			updates.scheduledTime.getTime() <= Date.now()
+		) {
+			return { error: "Scheduled time must be in the future" };
+		}
+
+		// Validate if updating year
+		if (updates.scheduledYear) {
+			const currentYear = await this.getCurrentYear(gameId);
+			if (updates.scheduledYear <= currentYear) {
+				return { error: "Scheduled year must be greater than current year" };
 			}
 		}
 
-		// Clear any existing schedules for this game
-		this.clearGameSchedules(gameId);
+		// Build update object
+		const updateData: Partial<{
+			scheduledYear: number;
+			scheduledTime: Date;
+		}> = {};
+		if (updates.scheduledYear !== undefined) {
+			updateData.scheduledYear = updates.scheduledYear;
+		}
+		if (updates.scheduledTime !== undefined) {
+			updateData.scheduledTime = updates.scheduledTime;
+		}
 
-		// Store new schedules
-		this.scheduledChanges.set(gameId, scheduledChanges);
+		if (Object.keys(updateData).length === 0) {
+			return { error: "No updates provided" };
+		}
+
+		// Update in database
+		const updated = await db
+			.update(yearSchedulesTable)
+			.set(updateData)
+			.where(
+				and(
+					eq(yearSchedulesTable.id, scheduleId),
+					eq(yearSchedulesTable.gameId, gameId),
+				),
+			)
+			.returning();
+
+		if (updated.length === 0) {
+			return { error: "Schedule not found" };
+		}
+
+		// Reschedule to apply changes
+		await this.scheduleGameYears(gameId);
+
+		return { success: true };
+	}
+
+	/**
+	 * Get all schedules for a game
+	 */
+	async getSchedules(gameId: number) {
+		return db
+			.select()
+			.from(yearSchedulesTable)
+			.where(eq(yearSchedulesTable.gameId, gameId));
 	}
 
 	/**
@@ -232,7 +395,7 @@ class YearScheduler {
 	}
 
 	/**
-	 * Clear all scheduled year changes for a game
+	 * Clear all scheduled year changes for a game (in-memory only)
 	 */
 	clearGameSchedules(gameId: number) {
 		const schedules = this.scheduledChanges.get(gameId);
@@ -245,7 +408,7 @@ class YearScheduler {
 	}
 
 	/**
-	 * Clear all scheduled year changes
+	 * Clear all scheduled year changes (in-memory only)
 	 */
 	clearAll() {
 		for (const gameId of this.scheduledChanges.keys()) {

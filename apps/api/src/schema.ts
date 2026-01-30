@@ -312,3 +312,33 @@ export const ErrorSchema = t.Object({
 });
 
 export type Error = Static<typeof ErrorSchema>;
+
+// Year schedule schema for API responses
+export const YearScheduleSchema = t.Object({
+	id: t.Number(),
+	gameId: t.Number(),
+	scheduledYear: t.Number(),
+	scheduledTime: t.Date(),
+	createdBy: t.String(),
+	createdAt: t.Date(),
+});
+
+export type YearSchedule = Static<typeof YearScheduleSchema>;
+
+export const CreateYearScheduleBodySchema = t.Object({
+	scheduledYear: t.Number(),
+	scheduledTime: t.String(), // ISO date string
+});
+
+export type CreateYearScheduleBody = Static<
+	typeof CreateYearScheduleBodySchema
+>;
+
+export const UpdateYearScheduleBodySchema = t.Object({
+	scheduledYear: t.Optional(t.Number()),
+	scheduledTime: t.Optional(t.String()), // ISO date string
+});
+
+export type UpdateYearScheduleBody = Static<
+	typeof UpdateYearScheduleBodySchema
+>;

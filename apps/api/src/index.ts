@@ -475,6 +475,12 @@ const app = new Elysia()
 				currentYear: 1938,
 			});
 
+			// Initialize year schedules from year durations
+			await yearScheduler.initializeGameSchedulesFromDurations(
+				newGame.id,
+				query.authorization,
+			);
+
 			// Create country states for all playable countries (not "Mods")
 			const countryStates = [];
 			for (const countryName of PLAYABLE_COUNTRIES) {
@@ -733,28 +739,270 @@ const app = new Elysia()
 			},
 		},
 	)
-	.post("/game/:gameId/next-year", async ({ params, query, set }) => {
-		// Check if user is admin or mod
-		const [user] = await db
-			.select()
-			.from(usersTable)
-			.where(eq(usersTable.id, query.authorization));
+	.post(
+		"/game/:gameId/next-year",
+		async ({ params, query, body, set }) => {
+			// Check if user is admin or mod
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
 
-		if (!user || (user.role !== "admin" && user.country !== "Mods")) {
-			set.status = 403;
+			if (!user || (user.role !== "admin" && user.country !== "Mods")) {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only admins and mods can advance the year",
+				};
+			}
+
+			const gameId = Number.parseInt(params.gameId, 10);
+			const currentYear = await yearScheduler.getCurrentYear(gameId);
+			const targetYear = body?.year ?? currentYear + 1;
+
+			if (targetYear <= currentYear) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: "Target year must be greater than current year",
+				};
+			}
+
+			await yearScheduler.handleYearChange(gameId, targetYear);
+			return { error: false as const };
+		},
+		{
+			body: t.Optional(
+				t.Object({
+					year: t.Optional(t.Number()),
+				}),
+			),
+			query: t.Object({
+				authorization: t.String(),
+			}),
+		},
+	)
+	// Year schedules endpoints
+	.get(
+		"/game/:gameId/year-schedules",
+		async ({ params, query, set }) => {
+			// Check if user is admin or mod
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+
+			if (!user || (user.role !== "admin" && user.country !== "Mods")) {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only admins and mods can view year schedules",
+				};
+			}
+
+			const gameId = Number.parseInt(params.gameId, 10);
+			const schedules = await yearScheduler.getSchedules(gameId);
+			const currentYear = await yearScheduler.getCurrentYear(gameId);
+
 			return {
-				error: true as const,
-				message: "Only admins and mods can advance the year",
+				error: false as const,
+				currentYear,
+				schedules: schedules.map((s) => ({
+					id: s.id,
+					gameId: s.gameId,
+					scheduledYear: s.scheduledYear,
+					scheduledTime: s.scheduledTime,
+					createdBy: s.createdBy,
+					createdAt: s.createdAt,
+				})),
 			};
-		}
+		},
+		{
+			query: t.Object({
+				authorization: t.String(),
+			}),
+			detail: {
+				summary: "Get Year Schedules",
+				description: "Returns all scheduled year changes for the game.",
+				tags: ["Game"],
+			},
+		},
+	)
+	.post(
+		"/game/:gameId/year-schedules",
+		async ({ params, query, body, set }) => {
+			// Check if user is admin or mod
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
 
-		const gameId = Number.parseInt(params.gameId, 10);
-		await yearScheduler.handleYearChange(
-			gameId,
-			(await yearScheduler.getCurrentYear(gameId)) + 1,
-		);
-		return { error: false as const };
-	})
+			if (!user || (user.role !== "admin" && user.country !== "Mods")) {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only admins and mods can add year schedules",
+				};
+			}
+
+			const gameId = Number.parseInt(params.gameId, 10);
+			const scheduledTime = new Date(body.scheduledTime);
+
+			if (Number.isNaN(scheduledTime.getTime())) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: "Invalid scheduled time format",
+				};
+			}
+
+			const result = await yearScheduler.addSchedule(
+				gameId,
+				body.scheduledYear,
+				scheduledTime,
+				query.authorization,
+			);
+
+			if ("error" in result) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: result.error,
+				};
+			}
+
+			return {
+				error: false as const,
+				id: result.id,
+			};
+		},
+		{
+			body: t.Object({
+				scheduledYear: t.Number(),
+				scheduledTime: t.String(),
+			}),
+			query: t.Object({
+				authorization: t.String(),
+			}),
+			detail: {
+				summary: "Add Year Schedule",
+				description: "Adds a new scheduled year change for the game.",
+				tags: ["Game"],
+			},
+		},
+	)
+	.delete(
+		"/game/:gameId/year-schedules/:scheduleId",
+		async ({ params, query, set }) => {
+			// Check if user is admin or mod
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+
+			if (!user || (user.role !== "admin" && user.country !== "Mods")) {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only admins and mods can delete year schedules",
+				};
+			}
+
+			const gameId = Number.parseInt(params.gameId, 10);
+			const scheduleId = Number.parseInt(params.scheduleId, 10);
+
+			const result = await yearScheduler.removeSchedule(scheduleId, gameId);
+
+			if ("error" in result) {
+				set.status = 404;
+				return {
+					error: true as const,
+					message: result.error,
+				};
+			}
+
+			return { error: false as const };
+		},
+		{
+			query: t.Object({
+				authorization: t.String(),
+			}),
+			detail: {
+				summary: "Delete Year Schedule",
+				description: "Removes a scheduled year change for the game.",
+				tags: ["Game"],
+			},
+		},
+	)
+	.patch(
+		"/game/:gameId/year-schedules/:scheduleId",
+		async ({ params, query, body, set }) => {
+			// Check if user is admin or mod
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+
+			if (!user || (user.role !== "admin" && user.country !== "Mods")) {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only admins and mods can update year schedules",
+				};
+			}
+
+			const gameId = Number.parseInt(params.gameId, 10);
+			const scheduleId = Number.parseInt(params.scheduleId, 10);
+
+			const updates: { scheduledYear?: number; scheduledTime?: Date } = {};
+
+			if (body.scheduledYear !== undefined) {
+				updates.scheduledYear = body.scheduledYear;
+			}
+
+			if (body.scheduledTime !== undefined) {
+				const scheduledTime = new Date(body.scheduledTime);
+				if (Number.isNaN(scheduledTime.getTime())) {
+					set.status = 400;
+					return {
+						error: true as const,
+						message: "Invalid scheduled time format",
+					};
+				}
+				updates.scheduledTime = scheduledTime;
+			}
+
+			const result = await yearScheduler.updateSchedule(
+				scheduleId,
+				gameId,
+				updates,
+			);
+
+			if ("error" in result) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: result.error,
+				};
+			}
+
+			return { error: false as const };
+		},
+		{
+			body: t.Object({
+				scheduledYear: t.Optional(t.Number()),
+				scheduledTime: t.Optional(t.String()),
+			}),
+			query: t.Object({
+				authorization: t.String(),
+			}),
+			detail: {
+				summary: "Update Year Schedule",
+				description: "Updates a scheduled year change for the game.",
+				tags: ["Game"],
+			},
+		},
+	)
 	.patch(
 		"/game/:gameId/country/:countryId/resources",
 		async ({ params, body, query, set }) => {
