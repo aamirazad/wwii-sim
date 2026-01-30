@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import Center from "@/components/center";
 import FullAlert from "@/components/full-alert";
 import LoadingSpinner from "@/components/loading-spinner";
+import ServerOffline from "@/components/server-offline";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,20 +18,6 @@ import {
 } from "@/components/ui/tooltip";
 import { useGamePageGuard } from "@/hooks/useGamePageGuard";
 import { useGame } from "../GameContext";
-
-function ServerOffline() {
-	return (
-		<FullAlert>
-			<Alert variant="destructive" className="max-w-md">
-				<AlertTitle>Server Unavailable</AlertTitle>
-				<AlertDescription>
-					The server is currently off. Please let Aamir know if you think this
-					is a mistake.
-				</AlertDescription>
-			</Alert>
-		</FullAlert>
-	);
-}
 
 function UnauthenticatedView() {
 	const router = useRouter();

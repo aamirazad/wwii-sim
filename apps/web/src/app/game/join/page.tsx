@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import Center from "@/components/center";
 import FullAlert from "@/components/full-alert";
 import LoadingSpinner from "@/components/loading-spinner";
+import ServerOffline from "@/components/server-offline";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,20 +19,6 @@ import {
 } from "@/components/ui/tooltip";
 import { useGamePageGuard } from "@/hooks/useGamePageGuard";
 import { useGame } from "../GameContext";
-
-function ServerOffline() {
-	return (
-		<FullAlert>
-			<Alert variant="destructive" className="max-w-md">
-				<AlertTitle>Server Unavailable</AlertTitle>
-				<AlertDescription>
-					The server is down right now. Please let Aamir know if you think this
-					is a mistake.
-				</AlertDescription>
-			</Alert>
-		</FullAlert>
-	);
-}
 
 function UnauthenticatedView() {
 	const router = useRouter();
@@ -49,8 +36,22 @@ function UnauthenticatedView() {
 	);
 }
 
-function NoGameInProgress({ isAdmin }: { isAdmin: boolean }) {
+function NoGameInProgress({
+	isAdmin,
+	refetchGame,
+}: {
+	isAdmin: boolean;
+	refetchGame: () => void;
+}) {
 	const router = useRouter();
+	// Poll for game status updates while on waiting screen
+	useEffect(() => {
+		const interval = setInterval(() => {
+			refetchGame();
+		}, 2000); // Poll every 2 seconds
+
+		return () => clearInterval(interval);
+	}, [refetchGame]);
 
 	return (
 		<FullAlert>
@@ -75,6 +76,7 @@ interface GameWaitingProps {
 	user: User;
 	connectionStatus: "connecting" | "connected" | "disconnected";
 	sendMessage: (message: ClientMessage) => void;
+	refetchGame: () => void;
 }
 
 function GameWaiting({
@@ -83,6 +85,7 @@ function GameWaiting({
 	connectionStatus,
 	sendMessage,
 	user,
+	refetchGame,
 }: GameWaitingProps) {
 	const [timeRemaining, setTimeRemaining] = useState<{
 		days: number;
@@ -91,6 +94,15 @@ function GameWaiting({
 		seconds: number;
 	} | null>(null);
 	const [isPastStartDate, setIsPastStartDate] = useState(false);
+
+	// Poll for game status updates while on waiting screen
+	useEffect(() => {
+		const interval = setInterval(() => {
+			refetchGame();
+		}, 2000); // Poll every 2 seconds
+
+		return () => clearInterval(interval);
+	}, [refetchGame]);
 
 	const connectionDotColor =
 		connectionStatus === "connected"
@@ -266,15 +278,6 @@ export default function JoinGame() {
 		userState,
 	});
 
-	// Poll for game status updates while on waiting screen
-	useEffect(() => {
-		const interval = setInterval(() => {
-			refetchGame();
-		}, 2000); // Poll every 2 seconds
-
-		return () => clearInterval(interval);
-	}, [refetchGame]);
-
 	// Listen for game start WebSocket message
 	useEffect(() => {
 		const unsubscribe = subscribeToMessage("server.game.started", () => {
@@ -300,12 +303,13 @@ export default function JoinGame() {
 	const isAdmin = user.role === "admin";
 
 	if (gameState.status === "no-game") {
-		return <NoGameInProgress isAdmin={isAdmin} />;
+		return <NoGameInProgress refetchGame={refetchGame} isAdmin={isAdmin} />;
 	}
 
 	if (gameState.game.status === "waiting") {
 		return (
 			<GameWaiting
+				refetchGame={refetchGame}
 				game={gameState.game}
 				isAdmin={isAdmin}
 				user={user}
