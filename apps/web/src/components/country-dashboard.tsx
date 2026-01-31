@@ -392,46 +392,48 @@ export default function CountryDashboard({
 												</AlertDialogContent>
 											</AlertDialog>
 										))}
-										<Dialog>
-											<DialogTrigger
-												render={
-													<Button className="h-16 w-16 flex flex-col items-center justify-center gap-1.5 p-2 hover:bg-muted/80 bg-transparent border-0 rounded-lg transition-colors" />
-												}
-											>
-												<Users
-													className="h-5 w-5 text-foreground/70 shrink-0"
-													strokeWidth={1.5}
-												/>
-												<span className="text-[10px] font-medium text-center text-foreground/80 leading-tight ">
-													Players
-												</span>
-											</DialogTrigger>
-											<DialogContent
-												showCloseButton={false}
-												className="max-w-fit!"
-											>
-												<ScrollArea className="-mx-4 max-h-[80vh] overflow-y-auto px-4">
-													<ManageUsers />
-												</ScrollArea>
-												<DialogFooter>
-													<DialogClose
-														render={<Button variant="outline">Cancel</Button>}
+										{userState.user.role === "admin" ? (
+											<Dialog>
+												<DialogTrigger
+													render={
+														<Button className="h-16 w-16 flex flex-col items-center justify-center gap-1.5 p-2 hover:bg-muted/80 bg-transparent border-0 rounded-lg transition-colors" />
+													}
+												>
+													<Users
+														className="h-5 w-5 text-foreground/70 shrink-0"
+														strokeWidth={1.5}
 													/>
-													<Button
-														nativeButton={false}
-														variant={"secondary"}
-														render={
-															<Link
-																href="/admin/users"
-																className="no-underline"
-															/>
-														}
-													>
-														<ExternalLinkIcon /> Open in full page
-													</Button>
-												</DialogFooter>
-											</DialogContent>
-										</Dialog>
+													<span className="text-[10px] font-medium text-center text-foreground/80 leading-tight ">
+														Players
+													</span>
+												</DialogTrigger>
+												<DialogContent
+													showCloseButton={false}
+													className="max-w-fit!"
+												>
+													<ScrollArea className="-mx-4 max-h-[80vh] overflow-y-auto px-4">
+														<ManageUsers />
+													</ScrollArea>
+													<DialogFooter>
+														<DialogClose
+															render={<Button variant="outline">Cancel</Button>}
+														/>
+														<Button
+															nativeButton={false}
+															variant={"secondary"}
+															render={
+																<Link
+																	href="/admin/users"
+																	className="no-underline"
+																/>
+															}
+														>
+															<ExternalLinkIcon /> Open in full page
+														</Button>
+													</DialogFooter>
+												</DialogContent>
+											</Dialog>
+										) : null}
 										<Button
 											nativeButton={false}
 											variant="ghost"
