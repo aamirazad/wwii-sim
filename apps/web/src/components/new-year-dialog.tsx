@@ -27,7 +27,9 @@ export function NewYearDialog() {
 				setChanges(msg.resourceChanges);
 				setOpen(true);
 				setCanClose(false);
-				// start 3s timer
+				// Immediately refetch game state to update year
+				refetchGame();
+				// start 2s timer before allowing close
 				if (closeTimeoutRef.current) {
 					clearTimeout(closeTimeoutRef.current);
 				}
@@ -46,7 +48,7 @@ export function NewYearDialog() {
 				closeTimeoutRef.current = null;
 			}
 		};
-	}, [subscribeToMessage]);
+	}, [subscribeToMessage, refetchGame]);
 
 	useEffect(() => {
 		if (!open) return;
@@ -55,13 +57,12 @@ export function NewYearDialog() {
 			// only allow Escape to close after the timer
 			if (e.key === "Escape" && canClose) {
 				setOpen(false);
-				refetchGame();
 			}
 		};
 
 		document.addEventListener("keydown", onKeyDown);
 		return () => document.removeEventListener("keydown", onKeyDown);
-	}, [open, canClose, refetchGame]);
+	}, [open, canClose]);
 
 	// ensure timer is cleared when dialog closes
 	useEffect(() => {
@@ -203,7 +204,6 @@ export function NewYearDialog() {
 							onClick={() => {
 								if (canClose) {
 									setOpen(false);
-									refetchGame();
 								}
 							}}
 							className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-800 shadow-sm transition hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900 disabled:opacity-50 disabled:pointer-events-none"

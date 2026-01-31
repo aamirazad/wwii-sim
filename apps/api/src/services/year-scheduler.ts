@@ -230,9 +230,17 @@ class YearScheduler {
 		}
 
 		// Validate if updating year
-		if (updates.scheduledYear) {
+		if (updates.scheduledYear !== undefined) {
+			const year = updates.scheduledYear;
+			if (
+				typeof year !== "number" ||
+				!Number.isFinite(year) ||
+				!Number.isInteger(year)
+			) {
+				return { error: "Scheduled year must be a valid integer" };
+			}
 			const currentYear = await this.getCurrentYear(gameId);
-			if (updates.scheduledYear <= currentYear) {
+			if (year <= currentYear) {
 				return { error: "Scheduled year must be greater than current year" };
 			}
 		}
@@ -388,6 +396,20 @@ class YearScheduler {
 				}),
 			);
 		}
+
+		// Broadcast year change to global room (for mods and users not subscribed to specific countries)
+		this.app?.server?.publish(
+			"global",
+			JSON.stringify({
+				type: "server.year.changed",
+				year: newYear,
+				resourceChanges: {
+					oil: RESOURCE_INCREMENT,
+					steel: RESOURCE_INCREMENT,
+					population: RESOURCE_INCREMENT,
+				},
+			}),
+		);
 
 		console.log(
 			`Year changed to ${newYear} for game ${gameId}. Resources incremented by ${RESOURCE_INCREMENT}.`,

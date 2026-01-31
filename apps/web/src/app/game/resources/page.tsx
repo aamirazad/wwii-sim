@@ -431,7 +431,7 @@ export default function GameResources() {
 	// The country to fetch data for - either user's country or mod's selected country
 	const targetCountry = isMod ? selectedCountry : userCountry;
 
-	// Query for country state (to get countryId)
+	// Query for country state (to get countryId and initial data)
 	const {
 		data: countryData,
 		isLoading: countryLoading,
@@ -451,17 +451,21 @@ export default function GameResources() {
 			return response.data;
 		},
 		enabled: !!userId && gameState.status === "has-game" && !!targetCountry,
+		staleTime: 30000, // 30s - rely on WS updates for freshness
 	});
 
 	// Subscribe to websocket resource updates
 	useEffect(() => {
 		const unsubscribe = subscribeToMessage("server.country.resources", () => {
-			// Refetch country state when resources update via websocket
-			refetchCountry();
+			// Only invalidate history - resource values come from WS via GameContext
 			queryClient.invalidateQueries({ queryKey: ["country-history"] });
+			// For mods viewing a different country, we need to refetch since they don't get WS updates for that country
+			if (isMod) {
+				refetchCountry();
+			}
 		});
 		return unsubscribe;
-	}, [subscribeToMessage, refetchCountry, queryClient]);
+	}, [subscribeToMessage, queryClient, isMod, refetchCountry]);
 
 	// Guard: requires active game (mods always have access)
 	useGamePageGuard({

@@ -187,6 +187,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
 			return response.data;
 		},
 		retry: 0,
+		refetchInterval: 30000, // 30s - handles waiting/lobby state and missed WS messages
+		refetchOnReconnect: true,
+		refetchOnWindowFocus: true,
 	});
 
 	// Query for user
@@ -203,6 +206,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
 			return response.data;
 		},
 		enabled: !!userId,
+		refetchInterval: 60000, // 1min - catches country assignment changes
+		refetchOnReconnect: true,
+		refetchOnWindowFocus: true,
 		retry: 0,
 	});
 

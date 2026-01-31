@@ -328,6 +328,7 @@ export default function SchedulePage() {
 		userState.status === "authenticated" && userState.user.role === "admin";
 	const isMod =
 		userState.status === "authenticated" && userState.user.country === "Mods";
+	const gameId = gameState.status === "has-game" && gameState.game.id;
 
 	// Redirect non-admin/mod users
 	useEffect(() => {
@@ -341,7 +342,7 @@ export default function SchedulePage() {
 		isLoading,
 		refetch,
 	} = useQuery<ScheduleData>({
-		queryKey: ["year-schedules", gameState],
+		queryKey: ["year-schedules", gameId],
 		queryFn: async () => {
 			if (!userId || gameState.status !== "has-game")
 				throw new Error("Not ready");
