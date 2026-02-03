@@ -21,9 +21,10 @@ export default async function Homepage() {
 					<p className="py-2 mt-5 rounded-lg bg-primary-foreground ">
 						{!userId ? (
 							<>
-								You must login to the site by clicking the link in the{" "}
-								<ExternalLink href="https://classroom.google.com/c/NzA4NjIyNTUxNDcy">
-									History Club Google Classroom
+								You are not logged in. Please login by by clicking the link sent
+								to{" "}
+								<ExternalLink href="https://mail.google.com/mail/u/0/#search/subject%3A(History+Sim+Login+Link)">
+									your email
 								</ExternalLink>
 							</>
 						) : (
