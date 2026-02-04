@@ -1,10 +1,24 @@
-import { cookies } from "next/headers";
-import Link from "next/link";
-import ExternalLink from "@/components/external-link";
+"use client";
 
-export default async function Homepage() {
-	const cookieStore = await cookies();
-	const userId = cookieStore.get("userId");
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import ExternalLink from "@/components/external-link";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { getUserId } from "@/lib/cookies";
+
+export default function Homepage() {
+	const [userId, setUserId] = useState<string | null>(null);
+	const [isHydrated, setIsHydrated] = useState(false);
+
+	useEffect(() => {
+		setUserId(getUserId());
+		setIsHydrated(true);
+	}, []);
+
 	return (
 		<div className="relative pointer-events-none flex flex-col items-center justify-center flex-1">
 			<div className="pointer-events-auto max-w-2/5 text-center">
@@ -18,14 +32,24 @@ export default async function Homepage() {
 						during the Second World War. The game lasts the whole day and
 						usually occurs once per marking period.
 					</p>
-					<p className="py-2 mt-5 rounded-lg bg-primary-foreground ">
-						{!userId ? (
+					<p className="py-2 mt-5 rounded-lg bg-primary-foreground min-h-10">
+						{!isHydrated ? (
+							"..."
+						) : !userId ? (
 							<>
 								You are not logged in. Please login by by clicking the link sent
 								to{" "}
-								<ExternalLink href="https://mail.google.com/mail/u/0/#search/subject%3A(History+Sim+Login+Link)">
-									your email
-								</ExternalLink>
+								<Tooltip>
+									<TooltipTrigger>
+										<ExternalLink href="https://mail.google.com/mail/u/0/#search/from%3A(amazad15%40hasdtigers.com)+subject%3A(History+Sim+Login+Link)+after%3A2026%2F2%2F5">
+											your email
+										</ExternalLink>
+									</TooltipTrigger>
+									<TooltipContent>
+										Hint: click this link to be taken directly to the email with
+										your link!
+									</TooltipContent>
+								</Tooltip>
 							</>
 						) : (
 							<>

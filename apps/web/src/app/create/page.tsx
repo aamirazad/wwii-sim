@@ -10,7 +10,6 @@ import {
 import { ChevronDownIcon } from "lucide-react";
 import { redirect, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getUserId } from "@/app/actions";
 import Center from "@/components/center";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -30,6 +29,7 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { api } from "@/lib/api";
+import { getUserId } from "@/lib/cookies";
 
 interface CountryConfig {
 	oil: number;
@@ -90,7 +90,7 @@ export default function CreateGamePage() {
 		setIsSubmitting(true);
 		setError(null);
 
-		const userId = await getUserId();
+		const userId = getUserId();
 		if (!userId) {
 			window.scrollTo(0, 0);
 			setError("You must be logged in to create a game");
@@ -137,7 +137,7 @@ export default function CreateGamePage() {
 
 	useEffect(() => {
 		(async () => {
-			const userId = await getUserId();
+			const userId = getUserId();
 			if (!userId) {
 				redirect("/");
 			}
