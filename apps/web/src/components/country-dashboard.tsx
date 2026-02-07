@@ -20,7 +20,9 @@ import { useEffect, useState } from "react";
 import { useGame } from "@/app/game/GameContext";
 import Dock from "@/components/dock";
 import ExternalLink from "@/components/external-link";
+import FullAlert from "@/components/full-alert";
 import ManageUsers from "@/components/manage-users";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -136,17 +138,25 @@ export default function CountryDashboard({
 	if (!country) {
 		return (
 			<div className="flex items-center justify-center h-64">
-				<p className="text-muted-foreground">
-					{userState.status === "authenticated" &&
-					userState.user.role === "admin" ? (
-						<>
-							You are not assigned to a country. You can assign users to
-							countries <ExternalLink href="/admin/users">here</ExternalLink>.
-						</>
-					) : (
-						"You are not assigned to a country. Please contact an admin."
-					)}
-				</p>
+				<div className="text-muted-foreground">
+					<FullAlert>
+						<Alert>
+							<AlertTitle>No Country Assigned</AlertTitle>
+							<AlertDescription>
+								{userState.status === "authenticated" &&
+								userState.user.role === "admin" ? (
+									<>
+										You are not assigned to a country. You can assign users to
+										countries <Link href="/admin/users">here</Link>.
+									</>
+								) : (
+									"You are not assigned to a country. Please ask a mod to help you."
+								)}
+							</AlertDescription>
+						</Alert>
+					</FullAlert>
+					)
+				</div>
 			</div>
 		);
 	}
@@ -321,7 +331,17 @@ export default function CountryDashboard({
 						<div className="flex items-center text-primary">
 							<MoveRight size={24} />
 						</div>
-						<p className="font-bold text-zinc-400 uppercase">{tab}</p>
+						<p
+							className="cursor-pointer font-bold text-zinc-400 uppercase"
+							onClick={() => {
+								router.push(
+									dockItems.filter((item) => item.label === tab)[0].href,
+								);
+							}}
+							onKeyDown={() => {}}
+						>
+							{tab}
+						</p>
 					</div>
 				</div>
 

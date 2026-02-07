@@ -14,6 +14,8 @@ import {
 	PLAYABLE_COUNTRIES,
 	type PlayableCountry,
 	resourceChangeLogTable,
+	troopChangeLogTable,
+	troopLocationTable,
 	type UserRole,
 	usersTable,
 } from "./db/schema";
@@ -29,6 +31,11 @@ import {
 	PlayableCountrySchema,
 	ResourceChangeLogSchema,
 	ServerMessageSchema,
+	TROOP_COSTS,
+	TROOP_TYPES,
+	TroopChangeLogSchema,
+	TroopCountsSchema,
+	TroopLocationSchema,
 	UserRoleSchema,
 	UserSchema,
 	type YearDurations,
@@ -1196,6 +1203,598 @@ const app = new Elysia()
 				description:
 					"Updates country resources and logs the change with a note.",
 				tags: ["Game"],
+			},
+		},
+	)
+	// --- Troop endpoints ---
+	.get(
+		"/game/:gameId/country/:countryId/troops",
+		async ({ params, query, set }) => {
+			const countryId = Number.parseInt(params.countryId, 10);
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			if (!user) {
+				set.status = 401;
+				return { error: true as const, message: "Unauthorized" };
+			}
+
+			const [country] = await db
+				.select()
+				.from(countryStateTable)
+				.where(eq(countryStateTable.id, countryId));
+			if (!country) {
+				set.status = 404;
+				return { error: true as const, message: "Country not found" };
+			}
+			if (user.country !== country.name && user.country !== "Mods") {
+				set.status = 403;
+				return { error: true as const, message: "Unauthorized" };
+			}
+
+			const locations = await db
+				.select()
+				.from(troopLocationTable)
+				.where(eq(troopLocationTable.countryStateId, countryId));
+
+			const logs = await db
+				.select()
+				.from(troopChangeLogTable)
+				.where(eq(troopChangeLogTable.countryStateId, countryId));
+
+			return {
+				error: false as const,
+				locations: locations.map((l) => ({
+					...l,
+					isHome: !!l.isHome,
+					createdAt: l.createdAt,
+					updatedAt: l.updatedAt,
+				})),
+				logs: logs.map((l) => ({
+					...l,
+					details: l.details ?? null,
+					createdAt: l.createdAt,
+				})),
+			};
+		},
+		{
+			params: t.Object({ gameId: t.String(), countryId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					locations: t.Array(TroopLocationSchema),
+					logs: t.Array(TroopChangeLogSchema),
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Get Troops",
+				description:
+					"Returns troop locations and change history for a country.",
+				tags: ["Troops"],
+			},
+		},
+	)
+	.post(
+		"/game/:gameId/country/:countryId/troops/purchase",
+		async ({ params, body, query, set }) => {
+			const countryId = Number.parseInt(params.countryId, 10);
+			const gameId = Number.parseInt(params.gameId, 10);
+
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			if (!user) {
+				set.status = 401;
+				return { error: true as const, message: "Unauthorized" };
+			}
+
+			const [country] = await db
+				.select()
+				.from(countryStateTable)
+				.where(eq(countryStateTable.id, countryId));
+			if (!country) {
+				set.status = 404;
+				return { error: true as const, message: "Country not found" };
+			}
+			if (user.country !== country.name && user.country !== "Mods") {
+				set.status = 403;
+				return { error: true as const, message: "Unauthorized" };
+			}
+
+			// Validate purchase quantities are non-negative
+			for (const tt of TROOP_TYPES) {
+				if (body.quantities[tt] < 0) {
+					set.status = 400;
+					return {
+						error: true as const,
+						message: "Purchase quantities must be non-negative",
+					};
+				}
+			}
+
+			const totalPurchased = TROOP_TYPES.reduce(
+				(sum, tt) => sum + body.quantities[tt],
+				0,
+			);
+			if (totalPurchased === 0) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: "Must purchase at least one troop",
+				};
+			}
+
+			// Compute total resource cost
+			let totalOil = 0;
+			let totalSteel = 0;
+			let totalPopulation = 0;
+			for (const tt of TROOP_TYPES) {
+				const qty = body.quantities[tt];
+				if (qty > 0) {
+					totalOil += TROOP_COSTS[tt].oil * qty;
+					totalSteel += TROOP_COSTS[tt].steel * qty;
+					totalPopulation += TROOP_COSTS[tt].population * qty;
+				}
+			}
+
+			// Check affordability (US has infinite oil)
+			const isUS = country.name === "United States";
+			if (!isUS && country.oil < totalOil) {
+				set.status = 400;
+				return { error: true as const, message: "Not enough oil" };
+			}
+			if (country.steel < totalSteel) {
+				set.status = 400;
+				return { error: true as const, message: "Not enough steel" };
+			}
+			if (country.population < totalPopulation) {
+				set.status = 400;
+				return { error: true as const, message: "Not enough population" };
+			}
+
+			// Validate allocations sum to purchased quantities
+			for (const tt of TROOP_TYPES) {
+				const allocatedSum = body.allocations.reduce(
+					(sum, a) => sum + a.troops[tt],
+					0,
+				);
+				if (allocatedSum !== body.quantities[tt]) {
+					set.status = 400;
+					return {
+						error: true as const,
+						message: `Allocation for ${tt} (${allocatedSum}) does not match purchase quantity (${body.quantities[tt]})`,
+					};
+				}
+			}
+
+			// Validate allocation values are non-negative
+			for (const alloc of body.allocations) {
+				for (const tt of TROOP_TYPES) {
+					if (alloc.troops[tt] < 0) {
+						set.status = 400;
+						return {
+							error: true as const,
+							message: "Allocation values must be non-negative",
+						};
+					}
+				}
+			}
+
+			// Deduct resources
+			const updateFields: Record<string, unknown> = {
+				updatedAt: new Date(),
+			};
+			if (totalOil > 0) {
+				updateFields.oil = sql`${countryStateTable.oil} - ${totalOil}`;
+			}
+			if (totalSteel > 0) {
+				updateFields.steel = sql`${countryStateTable.steel} - ${totalSteel}`;
+			}
+			if (totalPopulation > 0) {
+				updateFields.population = sql`${countryStateTable.population} - ${totalPopulation}`;
+			}
+			const [updatedCountry] = await db
+				.update(countryStateTable)
+				.set(updateFields)
+				.where(eq(countryStateTable.id, countryId))
+				.returning();
+
+			// Log resource changes
+			const resourceDeltas = [
+				{ type: "oil" as const, delta: -totalOil, prev: country.oil },
+				{ type: "steel" as const, delta: -totalSteel, prev: country.steel },
+				{
+					type: "population" as const,
+					delta: -totalPopulation,
+					prev: country.population,
+				},
+			];
+			for (const { type, delta, prev } of resourceDeltas) {
+				if (delta !== 0) {
+					await db.insert(resourceChangeLogTable).values({
+						countryStateId: countryId,
+						gameId,
+						resourceType: type,
+						previousValue: prev,
+						newValue: updatedCountry[type],
+						note: "Troop purchase",
+						changedBy: user.name,
+						createdAt: new Date(),
+					});
+				}
+			}
+
+			// Upsert troop locations
+			for (const alloc of body.allocations) {
+				const hasTroops = TROOP_TYPES.some((tt) => alloc.troops[tt] > 0);
+				if (!hasTroops) continue;
+
+				const [existing] = await db
+					.select()
+					.from(troopLocationTable)
+					.where(
+						and(
+							eq(troopLocationTable.countryStateId, countryId),
+							eq(troopLocationTable.name, alloc.location),
+						),
+					);
+
+				if (existing) {
+					const locUpdate: Record<string, unknown> = {
+						updatedAt: new Date(),
+					};
+					for (const tt of TROOP_TYPES) {
+						if (alloc.troops[tt] > 0) {
+							locUpdate[tt] =
+								sql`${troopLocationTable[tt]} + ${alloc.troops[tt]}`;
+						}
+					}
+					await db
+						.update(troopLocationTable)
+						.set(locUpdate)
+						.where(eq(troopLocationTable.id, existing.id));
+				} else {
+					await db.insert(troopLocationTable).values({
+						countryStateId: countryId,
+						gameId,
+						name: alloc.location,
+						isHome: alloc.isHome,
+						infantry: alloc.troops.infantry,
+						navalShips: alloc.troops.navalShips,
+						aircraftCarriers: alloc.troops.aircraftCarriers,
+						fighters: alloc.troops.fighters,
+						bombers: alloc.troops.bombers,
+						spies: alloc.troops.spies,
+						submarines: alloc.troops.submarines,
+						createdAt: new Date(),
+						updatedAt: new Date(),
+					});
+				}
+			}
+
+			// Log purchase
+			await db.insert(troopChangeLogTable).values({
+				countryStateId: countryId,
+				gameId,
+				actionType: "purchase",
+				infantry: body.quantities.infantry,
+				navalShips: body.quantities.navalShips,
+				aircraftCarriers: body.quantities.aircraftCarriers,
+				fighters: body.quantities.fighters,
+				bombers: body.quantities.bombers,
+				spies: body.quantities.spies,
+				submarines: body.quantities.submarines,
+				details: JSON.stringify(
+					body.allocations.map((a) => ({
+						location: a.location,
+						isHome: a.isHome,
+						troops: a.troops,
+					})),
+				),
+				oilCost: totalOil,
+				populationCost: totalPopulation,
+				steelCost: totalSteel,
+				changedBy: user.name,
+				createdAt: new Date(),
+			});
+
+			// Broadcast updated resources
+			const countryName = country.name as Country;
+			app.server?.publish(
+				`country:${countryName}`,
+				JSON.stringify({
+					type: "server.country.resources",
+					country: countryName,
+					resources: {
+						oil: updatedCountry.oil,
+						steel: updatedCountry.steel,
+						population: updatedCountry.population,
+					},
+				}),
+			);
+
+			return { error: false as const };
+		},
+		{
+			params: t.Object({ gameId: t.String(), countryId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+			body: t.Object({
+				quantities: TroopCountsSchema,
+				allocations: t.Array(
+					t.Object({
+						location: t.String(),
+						isHome: t.Boolean(),
+						troops: TroopCountsSchema,
+					}),
+				),
+			}),
+			response: t.Union([t.Object({ error: t.Literal(false) }), ErrorSchema]),
+			detail: {
+				summary: "Purchase Troops",
+				description:
+					"Purchases troops, deducts resources, and allocates to locations.",
+				tags: ["Troops"],
+			},
+		},
+	)
+	.patch(
+		"/game/:gameId/country/:countryId/troops/locations",
+		async ({ params, body, query, set }) => {
+			const countryId = Number.parseInt(params.countryId, 10);
+			const gameId = Number.parseInt(params.gameId, 10);
+
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			if (!user) {
+				set.status = 401;
+				return { error: true as const, message: "Unauthorized" };
+			}
+
+			const [country] = await db
+				.select()
+				.from(countryStateTable)
+				.where(eq(countryStateTable.id, countryId));
+			if (!country) {
+				set.status = 404;
+				return { error: true as const, message: "Country not found" };
+			}
+			if (user.country !== country.name && user.country !== "Mods") {
+				set.status = 403;
+				return { error: true as const, message: "Unauthorized" };
+			}
+
+			// Get current locations
+			const currentLocations = await db
+				.select()
+				.from(troopLocationTable)
+				.where(eq(troopLocationTable.countryStateId, countryId));
+
+			// Compute current totals per troop type
+			const currentTotals: Record<string, number> = {};
+			for (const tt of TROOP_TYPES) {
+				currentTotals[tt] = currentLocations.reduce(
+					(sum, loc) => sum + loc[tt],
+					0,
+				);
+			}
+
+			// Compute new totals from body
+			const newTotals: Record<string, number> = {};
+			for (const tt of TROOP_TYPES) {
+				newTotals[tt] = body.locations.reduce(
+					(sum, loc) => sum + loc.troops[tt],
+					0,
+				);
+			}
+
+			// Calculate losses (totals can decrease but not increase)
+			let totalLosses = 0;
+			const lossesPerType: Record<string, number> = {};
+			for (const tt of TROOP_TYPES) {
+				const loss = Math.max(0, currentTotals[tt] - newTotals[tt]);
+				lossesPerType[tt] = loss;
+				totalLosses += loss;
+				if (newTotals[tt] > currentTotals[tt]) {
+					set.status = 400;
+					return {
+						error: true as const,
+						message: `Cannot add ${tt} here. Total ${tt} would increase from ${currentTotals[tt]} to ${newTotals[tt]}. Purchase troops instead.`,
+					};
+				}
+			}
+
+			// Validate all troop counts are non-negative
+			for (const loc of body.locations) {
+				for (const tt of TROOP_TYPES) {
+					if (loc.troops[tt] < 0) {
+						set.status = 400;
+						return {
+							error: true as const,
+							message: "Troop counts cannot be negative",
+						};
+					}
+				}
+			}
+
+			// Compute movement cost: sum of decreases at each location minus losses
+			// (losses don't cost oil to move)
+			let totalDecreases = 0;
+			const currentByName = new Map(currentLocations.map((l) => [l.name, l]));
+			for (const loc of body.locations) {
+				const existing = currentByName.get(loc.name);
+				if (existing) {
+					for (const tt of TROOP_TYPES) {
+						const diff = existing[tt] - loc.troops[tt];
+						if (diff > 0) totalDecreases += diff;
+					}
+				}
+			}
+			const totalMoved = totalDecreases - totalLosses;
+
+			// Check oil affordability for movement
+			const isUS = country.name === "United States";
+			if (!isUS && totalMoved > 0 && country.oil < totalMoved) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: `Not enough oil. Moving ${totalMoved} troops costs ${totalMoved} oil.`,
+				};
+			}
+
+			// Deduct oil for movement
+			if (totalMoved > 0) {
+				const [updatedCountry] = await db
+					.update(countryStateTable)
+					.set({
+						oil: sql`${countryStateTable.oil} - ${totalMoved}`,
+						updatedAt: new Date(),
+					})
+					.where(eq(countryStateTable.id, countryId))
+					.returning();
+
+				await db.insert(resourceChangeLogTable).values({
+					countryStateId: countryId,
+					gameId,
+					resourceType: "oil",
+					previousValue: country.oil,
+					newValue: updatedCountry.oil,
+					note: `Troop movement (${totalMoved} troops moved)`,
+					changedBy: user.name,
+					createdAt: new Date(),
+				});
+
+				// Broadcast updated resources
+				const countryName = country.name as Country;
+				app.server?.publish(
+					`country:${countryName}`,
+					JSON.stringify({
+						type: "server.country.resources",
+						country: countryName,
+						resources: {
+							oil: updatedCountry.oil,
+							steel: updatedCountry.steel,
+							population: updatedCountry.population,
+						},
+					}),
+				);
+			}
+
+			// Delete all existing locations and re-insert
+			await db
+				.delete(troopLocationTable)
+				.where(eq(troopLocationTable.countryStateId, countryId));
+
+			for (const loc of body.locations) {
+				const hasTroops = TROOP_TYPES.some((tt) => loc.troops[tt] > 0);
+				if (!hasTroops) continue;
+				await db.insert(troopLocationTable).values({
+					countryStateId: countryId,
+					gameId,
+					name: loc.name,
+					isHome: loc.isHome,
+					infantry: loc.troops.infantry,
+					navalShips: loc.troops.navalShips,
+					aircraftCarriers: loc.troops.aircraftCarriers,
+					fighters: loc.troops.fighters,
+					bombers: loc.troops.bombers,
+					spies: loc.troops.spies,
+					submarines: loc.troops.submarines,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				});
+			}
+
+			// Log losses if any
+			if (totalLosses > 0) {
+				await db.insert(troopChangeLogTable).values({
+					countryStateId: countryId,
+					gameId,
+					actionType: "loss",
+					infantry: lossesPerType.infantry,
+					navalShips: lossesPerType.navalShips,
+					aircraftCarriers: lossesPerType.aircraftCarriers,
+					fighters: lossesPerType.fighters,
+					bombers: lossesPerType.bombers,
+					spies: lossesPerType.spies,
+					submarines: lossesPerType.submarines,
+					details: null,
+					oilCost: 0,
+					populationCost: 0,
+					steelCost: 0,
+					changedBy: user.name,
+					createdAt: new Date(),
+				});
+			}
+
+			// Log movement if troops were actually moved
+			if (totalMoved > 0) {
+				// Compute per-type movement (only count decreases, not losses)
+				const movementPerType: Record<string, number> = {};
+				for (const tt of TROOP_TYPES) {
+					let decreases = 0;
+					for (const loc of body.locations) {
+						const existing = currentByName.get(loc.name);
+						if (existing) {
+							const diff = existing[tt] - loc.troops[tt];
+							if (diff > 0) decreases += diff;
+						}
+					}
+					// Subtract losses from decreases to get actual movement
+					movementPerType[tt] = Math.max(0, decreases - lossesPerType[tt]);
+				}
+
+				await db.insert(troopChangeLogTable).values({
+					countryStateId: countryId,
+					gameId,
+					actionType: "movement",
+					infantry: movementPerType.infantry,
+					navalShips: movementPerType.navalShips,
+					aircraftCarriers: movementPerType.aircraftCarriers,
+					fighters: movementPerType.fighters,
+					bombers: movementPerType.bombers,
+					spies: movementPerType.spies,
+					submarines: movementPerType.submarines,
+					details: JSON.stringify(
+						body.locations.map((l) => ({
+							location: l.name,
+							isHome: l.isHome,
+							troops: l.troops,
+						})),
+					),
+					oilCost: totalMoved,
+					populationCost: 0,
+					steelCost: 0,
+					changedBy: user.name,
+					createdAt: new Date(),
+				});
+			}
+
+			return { error: false as const };
+		},
+		{
+			params: t.Object({ gameId: t.String(), countryId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+			body: t.Object({
+				locations: t.Array(
+					t.Object({
+						name: t.String(),
+						isHome: t.Boolean(),
+						troops: TroopCountsSchema,
+					}),
+				),
+			}),
+			response: t.Union([t.Object({ error: t.Literal(false) }), ErrorSchema]),
+			detail: {
+				summary: "Update Troop Locations",
+				description:
+					"Moves troops between locations. Totals must remain the same. Costs 1 oil per troop moved.",
+				tags: ["Troops"],
 			},
 		},
 	)

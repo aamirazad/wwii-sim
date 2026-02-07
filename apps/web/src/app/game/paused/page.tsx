@@ -164,7 +164,7 @@ export default function GamePausedPage() {
 		const unsubscribe = subscribeToMessage("server.game.unpaused", () => {
 			// Redirect to resources page when game is unpaused
 			refetchGame();
-			router.replace("/game/resources");
+			router.replace("/game/assets");
 		});
 
 		return unsubscribe;
@@ -175,7 +175,7 @@ export default function GamePausedPage() {
 
 	useEffect(() => {
 		if (gameStatus !== "paused") {
-			router.replace("/game/resources");
+			router.replace("/game/assets");
 			return;
 		}
 	}, [gameStatus, router]);

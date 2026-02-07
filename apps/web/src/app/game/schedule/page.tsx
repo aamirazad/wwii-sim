@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useGame } from "@/app/game/GameContext";
 import CountryDashboard from "@/components/country-dashboard";
+import GoBack from "@/components/go-back";
 import LoadingSpinner from "@/components/loading-spinner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -333,7 +334,7 @@ export default function SchedulePage() {
 	// Redirect non-admin/mod users
 	useEffect(() => {
 		if (userState.status === "authenticated" && !isAdmin && !isMod) {
-			router.push("/game/resources");
+			router.push("/game/assets");
 		}
 	}, [userState, isAdmin, isMod, router]);
 
@@ -395,7 +396,10 @@ export default function SchedulePage() {
 				{/* Schedules Card */}
 				<Card>
 					<CardHeader className="flex flex-row items-center justify-between">
-						<CardTitle>Scheduled Year Changes</CardTitle>
+						<CardTitle className="flex items-center">
+							<GoBack />
+							Scheduled Year Changes
+						</CardTitle>
 						<AddScheduleDialog
 							gameId={gameState.game.id}
 							onSuccess={handleRefresh}

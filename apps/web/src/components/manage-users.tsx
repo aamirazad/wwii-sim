@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronsUpDown, Copy, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import GoBack from "@/components/go-back";
 import LoadingSpinner from "@/components/loading-spinner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +52,7 @@ import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
 import { cn } from "@/lib/utils";
 
-export default function ManageUsers() {
+export default function ManageUsers({ fullPage }: { fullPage?: boolean }) {
 	const router = useRouter();
 	const queryClient = useQueryClient();
 	const userId = getUserId();
@@ -179,7 +180,10 @@ export default function ManageUsers() {
 		<>
 			<div className="flex justify-between items-center mb-6">
 				<div>
-					<h1 className="text-3xl font-bold">User Management</h1>
+					<h1 className="text-3xl font-bold">
+						{fullPage && <GoBack />}
+						User Management
+					</h1>
 					<p className="text-muted-foreground">
 						Create users and assign them to countries
 					</p>

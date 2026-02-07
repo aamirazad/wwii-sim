@@ -25,7 +25,7 @@ interface UseGamePageGuardOptions {
  * Rules:
  * - Mods (country === "Mods") always have access to active/paused game pages
  * - Pages requiring "active-game" redirect to /game/join if no game or game not active
- * - Pages requiring "paused-game" redirect to /game/resources if game is active
+ * - Pages requiring "paused-game" redirect to /game/assets if game is active
  * - Pages requiring "waiting-game" redirect based on game status
  *
  * @example
@@ -107,7 +107,7 @@ export function useGamePageGuard({
 				}
 
 				if (gameStatus === "active") {
-					router.replace("/game/resources");
+					router.replace("/game/assets");
 					return;
 				}
 			}
@@ -120,7 +120,7 @@ export function useGamePageGuard({
 
 				// Active game: go to resources
 				if (gameStatus === "active") {
-					router.replace("/game/resources");
+					router.replace("/game/assets");
 					return;
 				}
 

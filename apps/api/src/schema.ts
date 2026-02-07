@@ -342,3 +342,106 @@ export const UpdateYearScheduleBodySchema = t.Object({
 export type UpdateYearScheduleBody = Static<
 	typeof UpdateYearScheduleBodySchema
 >;
+
+// Troop types and costs
+
+export const TROOP_TYPES = [
+	"infantry",
+	"navalShips",
+	"aircraftCarriers",
+	"fighters",
+	"bombers",
+	"spies",
+	"submarines",
+] as const;
+export type TroopType = (typeof TROOP_TYPES)[number];
+
+export const TROOP_LABELS: Record<TroopType, string> = {
+	infantry: "Infantry",
+	navalShips: "Naval Ships",
+	aircraftCarriers: "Aircraft Carriers",
+	fighters: "Fighters",
+	bombers: "Bombers",
+	spies: "Spies",
+	submarines: "Submarines",
+};
+
+export const TROOP_COSTS: Record<
+	TroopType,
+	{ population: number; oil: number; steel: number }
+> = {
+	infantry: { population: 2, oil: 1, steel: 1 },
+	navalShips: { population: 1, oil: 2, steel: 3 },
+	aircraftCarriers: { population: 2, oil: 4, steel: 4 },
+	fighters: { population: 1, oil: 1, steel: 2 },
+	bombers: { population: 1, oil: 2, steel: 3 },
+	spies: { population: 1, oil: 1, steel: 1 },
+	submarines: { population: 1, oil: 3, steel: 2 },
+};
+
+export const TroopCountsSchema = t.Object({
+	infantry: t.Number(),
+	navalShips: t.Number(),
+	aircraftCarriers: t.Number(),
+	fighters: t.Number(),
+	bombers: t.Number(),
+	spies: t.Number(),
+	submarines: t.Number(),
+});
+
+export type TroopCounts = Static<typeof TroopCountsSchema>;
+
+export const ZERO_TROOPS: TroopCounts = {
+	infantry: 0,
+	navalShips: 0,
+	aircraftCarriers: 0,
+	fighters: 0,
+	bombers: 0,
+	spies: 0,
+	submarines: 0,
+};
+
+export const TroopLocationSchema = t.Object({
+	id: t.Number(),
+	countryStateId: t.Number(),
+	gameId: t.Number(),
+	name: t.String(),
+	isHome: t.Boolean(),
+	infantry: t.Number(),
+	navalShips: t.Number(),
+	aircraftCarriers: t.Number(),
+	fighters: t.Number(),
+	bombers: t.Number(),
+	spies: t.Number(),
+	submarines: t.Number(),
+	createdAt: t.Date(),
+	updatedAt: t.Date(),
+});
+
+export type TroopLocation = Static<typeof TroopLocationSchema>;
+
+export const TroopChangeLogSchema = t.Object({
+	id: t.Number(),
+	countryStateId: t.Number(),
+	gameId: t.Number(),
+	actionType: t.Union([
+		t.Literal("purchase"),
+		t.Literal("movement"),
+		t.Literal("loss"),
+	]),
+	infantry: t.Number(),
+	navalShips: t.Number(),
+	aircraftCarriers: t.Number(),
+	fighters: t.Number(),
+	bombers: t.Number(),
+	spies: t.Number(),
+	submarines: t.Number(),
+	details: t.Nullable(t.String()),
+	oilCost: t.Number(),
+	populationCost: t.Number(),
+	steelCost: t.Number(),
+	changedBy: t.String(),
+	createdAt: t.Date(),
+});
+
+export type TroopChangeLog = Static<typeof TroopChangeLogSchema>;

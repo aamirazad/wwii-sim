@@ -1,4 +1,5 @@
 import { createId } from "@paralleldrive/cuid2";
+import { sql } from "drizzle-orm";
 import * as t from "drizzle-orm/sqlite-core";
 
 // Shared type constants
@@ -51,7 +52,7 @@ export const usersTable = t.sqliteTable("users", {
 	country: t.text("country").$type<Country>(),
 	createdAt: t
 		.integer("created_at", { mode: "timestamp" })
-		.default(new Date())
+		.default(sql`(strftime('%s','now'))`)
 		.notNull(),
 });
 
@@ -68,7 +69,7 @@ export const gamesTable = t.sqliteTable("games", {
 		.$type<Record<string, number>>(),
 	createdAt: t
 		.integer("created_at", { mode: "timestamp" })
-		.default(new Date())
+		.default(sql`(strftime('%s','now'))`)
 		.notNull(),
 });
 
@@ -82,7 +83,7 @@ export const gameStateTable = t.sqliteTable("game_state", {
 	data: t.text("data", { mode: "json" }),
 	updatedAt: t
 		.integer("updated_at", { mode: "timestamp" })
-		.default(new Date())
+		.default(sql`(strftime('%s','now'))`)
 		.notNull(),
 });
 
@@ -99,11 +100,11 @@ export const countryStateTable = t.sqliteTable("country_state", {
 	population: t.int("population").default(0).notNull(),
 	createdAt: t
 		.integer("created_at", { mode: "timestamp" })
-		.default(new Date())
+		.default(sql`(strftime('%s','now'))`)
 		.notNull(),
 	updatedAt: t
 		.integer("updated_at", { mode: "timestamp" })
-		.default(new Date())
+		.default(sql`(strftime('%s','now'))`)
 		.notNull(),
 });
 
@@ -135,7 +136,7 @@ export const resourceChangeLogTable = t.sqliteTable("resource_change_log", {
 		.references(() => usersTable.id, { onDelete: "cascade" }),
 	createdAt: t
 		.integer("created_at", { mode: "timestamp" })
-		.default(new Date())
+		.default(sql`(strftime('%s','now'))`)
 		.notNull(),
 });
 
@@ -159,7 +160,102 @@ export const announcementsTable = t.sqliteTable("announcements", {
 		.references(() => usersTable.id, { onDelete: "cascade" }),
 	createdAt: t
 		.integer("created_at", { mode: "timestamp" })
-		.default(new Date())
+		.default(sql`(strftime('%s','now'))`)
+		.notNull(),
+});
+
+// Troop types
+export const TROOP_TYPES = [
+	"infantry",
+	"navalShips",
+	"aircraftCarriers",
+	"fighters",
+	"bombers",
+	"spies",
+	"submarines",
+] as const;
+export type TroopType = (typeof TROOP_TYPES)[number];
+
+// Cost per unit for each troop type: { population, oil, steel }
+export const TROOP_COSTS: Record<
+	TroopType,
+	{ population: number; oil: number; steel: number }
+> = {
+	infantry: { population: 2, oil: 1, steel: 1 },
+	navalShips: { population: 1, oil: 2, steel: 3 },
+	aircraftCarriers: { population: 2, oil: 4, steel: 4 },
+	fighters: { population: 1, oil: 1, steel: 2 },
+	bombers: { population: 1, oil: 2, steel: 3 },
+	spies: { population: 1, oil: 1, steel: 1 },
+	submarines: { population: 1, oil: 3, steel: 2 },
+};
+
+// Troop locations table
+export const troopLocationTable = t.sqliteTable("troop_location", {
+	id: t.int().primaryKey({ autoIncrement: true }),
+	countryStateId: t
+		.int("country_state_id")
+		.notNull()
+		.references(() => countryStateTable.id, { onDelete: "cascade" }),
+	gameId: t
+		.int("game_id")
+		.notNull()
+		.references(() => gamesTable.id, { onDelete: "cascade" }),
+	name: t.text("name").notNull(),
+	isHome: t.int("is_home", { mode: "boolean" }).notNull().default(true),
+	// Troop counts at this location
+	infantry: t.int("infantry").notNull().default(0),
+	navalShips: t.int("naval_ships").notNull().default(0),
+	aircraftCarriers: t.int("aircraft_carriers").notNull().default(0),
+	fighters: t.int("fighters").notNull().default(0),
+	bombers: t.int("bombers").notNull().default(0),
+	spies: t.int("spies").notNull().default(0),
+	submarines: t.int("submarines").notNull().default(0),
+	createdAt: t
+		.integer("created_at", { mode: "timestamp" })
+		.default(sql`(strftime('%s','now'))`)
+		.notNull(),
+	updatedAt: t
+		.integer("updated_at", { mode: "timestamp" })
+		.default(sql`(strftime('%s','now'))`)
+		.notNull(),
+});
+
+// Troop change log for purchase and movement history
+export const troopChangeLogTable = t.sqliteTable("troop_change_log", {
+	id: t.int().primaryKey({ autoIncrement: true }),
+	countryStateId: t
+		.int("country_state_id")
+		.notNull()
+		.references(() => countryStateTable.id, { onDelete: "cascade" }),
+	gameId: t
+		.int("game_id")
+		.notNull()
+		.references(() => gamesTable.id, { onDelete: "cascade" }),
+	// "purchase", "movement", or "loss"
+	actionType: t
+		.text("action_type")
+		.$type<"purchase" | "movement" | "loss">()
+		.notNull(),
+	// Deltas per troop type (positive for purchase, positive/negative for movement)
+	infantry: t.int("infantry").notNull().default(0),
+	navalShips: t.int("naval_ships").notNull().default(0),
+	aircraftCarriers: t.int("aircraft_carriers").notNull().default(0),
+	fighters: t.int("fighters").notNull().default(0),
+	bombers: t.int("bombers").notNull().default(0),
+	spies: t.int("spies").notNull().default(0),
+	submarines: t.int("submarines").notNull().default(0),
+	// For purchases: where troops were placed; for movements: location changes
+	details: t.text("details", { mode: "json" }).$type<string>(),
+	// Oil spent on movement
+	oilCost: t.int("oil_cost").notNull().default(0),
+	// Resource cost for purchases
+	populationCost: t.int("population_cost").notNull().default(0),
+	steelCost: t.int("steel_cost").notNull().default(0),
+	changedBy: t.text("changed_by").notNull(),
+	createdAt: t
+		.integer("created_at", { mode: "timestamp" })
+		.default(sql`(strftime('%s','now'))`)
 		.notNull(),
 });
 
@@ -181,7 +277,7 @@ export const yearSchedulesTable = t.sqliteTable("year_schedules", {
 		.references(() => usersTable.id, { onDelete: "cascade" }),
 	createdAt: t
 		.integer("created_at", { mode: "timestamp" })
-		.default(new Date())
+		.default(sql`(strftime('%s','now'))`)
 		.notNull(),
 });
 
@@ -192,6 +288,8 @@ export const table = {
 	countryStateTable,
 	resourceChangeLogTable,
 	announcementsTable,
+	troopLocationTable,
+	troopChangeLogTable,
 	yearSchedulesTable,
 } as const;
 

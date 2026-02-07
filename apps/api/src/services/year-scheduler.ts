@@ -7,9 +7,11 @@ import {
 	gameStateTable,
 	gamesTable,
 	resourceChangeLogTable,
+	troopLocationTable,
 	yearSchedulesTable,
 } from "../db/schema";
 import type { YearDurations } from "../schema";
+import { TROOP_TYPES } from "../schema";
 
 const GAME_YEARS = [1938, 1939, 1940, 1941, 1942, 1943, 1944] as const;
 
@@ -328,11 +330,31 @@ class YearScheduler {
 			const newSteel = country.steel + RESOURCE_INCREMENT;
 			const newPopulation = country.population + RESOURCE_INCREMENT;
 
+			// Calculate occupation cost: 1 oil per troop in non-home locations
+			const occupiedLocations = await db
+				.select()
+				.from(troopLocationTable)
+				.where(
+					and(
+						eq(troopLocationTable.countryStateId, country.id),
+						eq(troopLocationTable.isHome, false),
+					),
+				);
+
+			let occupationCost = 0;
+			for (const loc of occupiedLocations) {
+				for (const tt of TROOP_TYPES) {
+					occupationCost += loc[tt];
+				}
+			}
+
+			const finalOil = newOil - occupationCost;
+
 			// Update country resources
 			await db
 				.update(countryStateTable)
 				.set({
-					oil: newOil,
+					oil: finalOil,
 					steel: newSteel,
 					population: newPopulation,
 					updatedAt: new Date(),
@@ -340,8 +362,17 @@ class YearScheduler {
 				.where(eq(countryStateTable.id, country.id));
 
 			// Log resource changes
+			const oilNote =
+				occupationCost > 0
+					? `Year ${newYear} (+${RESOURCE_INCREMENT} income, -${occupationCost} occupation)`
+					: `Year ${newYear}`;
+
 			const resources = [
-				{ type: "oil" as const, oldValue: country.oil, newValue: newOil },
+				{
+					type: "oil" as const,
+					oldValue: country.oil,
+					newValue: finalOil,
+				},
 				{
 					type: "steel" as const,
 					oldValue: country.steel,
@@ -361,7 +392,7 @@ class YearScheduler {
 					resourceType: resource.type,
 					previousValue: resource.oldValue,
 					newValue: resource.newValue,
-					note: `Year ${newYear}`,
+					note: resource.type === "oil" ? oilNote : `Year ${newYear}`,
 					changedBy: "system",
 					createdAt: new Date(),
 				});
@@ -375,7 +406,7 @@ class YearScheduler {
 					type: "server.year.changed",
 					year: newYear,
 					resourceChanges: {
-						oil: RESOURCE_INCREMENT,
+						oil: RESOURCE_INCREMENT - occupationCost,
 						steel: RESOURCE_INCREMENT,
 						population: RESOURCE_INCREMENT,
 					},
@@ -389,7 +420,7 @@ class YearScheduler {
 					type: "server.country.resources",
 					country: countryName,
 					resources: {
-						oil: newOil,
+						oil: finalOil,
 						steel: newSteel,
 						population: newPopulation,
 					},
