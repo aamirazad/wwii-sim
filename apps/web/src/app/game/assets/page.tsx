@@ -2,8 +2,17 @@
 
 import type { Country, CountryState, ResourceChangeLog } from "@api/schema";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Droplets, Hammer, History, Users } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import {
+	ArrowLeft,
+	Beaker,
+	Droplets,
+	Factory,
+	Hammer,
+	History,
+	Pickaxe,
+	Users,
+} from "lucide-react";
+import { type SubmitEvent, useEffect, useState } from "react";
 import CountryDashboard from "@/components/country-dashboard";
 import LoadingSpinner from "@/components/loading-spinner";
 import { Button } from "@/components/ui/button";
@@ -76,6 +85,34 @@ function ResourceCard({
 	);
 }
 
+function MenuSelectionCard({
+	title,
+	description,
+	icon,
+	onClick,
+}: {
+	title: string;
+	description: string;
+	icon: React.ReactNode;
+	onClick: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className="group flex h-64 flex-col items-center justify-center space-y-4 rounded-xl border-2 border-muted bg-card p-6 text-center transition-all hover:border-primary/50 hover:bg-accent/5 focus:outline-none focus:ring-2 focus:ring-primary"
+		>
+			<div className="rounded-full bg-primary/10 p-4 text-primary transition-colors group-hover:bg-primary/20">
+				{icon}
+			</div>
+			<div className="space-y-1">
+				<h3 className="text-xl font-bold tracking-tight">{title}</h3>
+				<p className="max-w-50 text-sm text-muted-foreground">{description}</p>
+			</div>
+		</button>
+	);
+}
+
 function ResourceChangeForm({
 	countryState,
 	onSuccess,
@@ -99,7 +136,7 @@ function ResourceChangeForm({
 	const anyNegative =
 		resultingOil < 0 || resultingSteel < 0 || resultingPopulation < 0;
 
-	const handleSubmit = async (e: FormEvent) => {
+	const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		if (!userId || !note.trim()) return;
 
@@ -319,7 +356,7 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger render={<Button variant="outline" />}>
 				<History className="mr-2 h-4 w-4" />
-				View History
+				View Resource Change History
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
 				<DialogHeader>
@@ -413,11 +450,15 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 	);
 }
 
-export default function GameResources() {
+export default function Assets() {
 	const { gameState, userState, countryResources, subscribeToMessage } =
 		useGame();
 	const userId = getUserId();
 	const queryClient = useQueryClient();
+
+	const [tab, setTab] = useState<
+		"change-resources" | "troop-creation" | "research" | "home"
+	>("home");
 
 	const userCountry =
 		userState.status === "authenticated" ? userState.user.country : null;
@@ -493,7 +534,7 @@ export default function GameResources() {
 
 	if (!countryState && !countryLoading) {
 		return (
-			<CountryDashboard tab="Resources">
+			<CountryDashboard tab="Assets">
 				<p className="text-muted-foreground">Unable to load country data.</p>
 			</CountryDashboard>
 		);
@@ -505,7 +546,7 @@ export default function GameResources() {
 	};
 
 	return (
-		<CountryDashboard tab="Resources">
+		<CountryDashboard tab="Assets">
 			<div className="space-y-8">
 				{/* Country Selector for Mods */}
 				{isMod && (
@@ -556,20 +597,89 @@ export default function GameResources() {
 							/>
 						</div>
 
-						{/* Resource Change Form */}
-						<Card>
-							<CardHeader>
-								<CardTitle className="text-xl">
-									Change Resources{isMod ? ` for ${countryState.name}` : ""}
-								</CardTitle>
-							</CardHeader>
-							<CardContent>
-								<ResourceChangeForm
-									countryState={countryState}
-									onSuccess={handleChangeSuccess}
+						{tab === "home" && (
+							<div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+								<MenuSelectionCard
+									title="Manage Resources"
+									description="Adjust resource amounts."
+									icon={<Pickaxe className="h-8 w-8" />}
+									onClick={() => setTab("change-resources")}
 								/>
-							</CardContent>
-						</Card>
+								<MenuSelectionCard
+									title="Troop Creation"
+									description="Build and manage your military force."
+									icon={<Factory className="h-8 w-8" />}
+									onClick={() => setTab("troop-creation")}
+								/>
+								<MenuSelectionCard
+									title="Research"
+									description="Develop your country."
+									icon={<Beaker className="h-8 w-8" />}
+									onClick={() => setTab("research")}
+								/>
+							</div>
+						)}
+
+						{/* Resource Change Form */}
+						{tab === "change-resources" && (
+							<Card>
+								<CardHeader>
+									<CardTitle className="text-xl">
+										<Tooltip>
+											<TooltipTrigger
+												render={
+													<Button
+														className="mr-2"
+														onClick={() => setTab("home")}
+														size="icon"
+													>
+														<ArrowLeft />
+													</Button>
+												}
+											/>
+
+											<TooltipContent>Go Back</TooltipContent>
+										</Tooltip>
+										Change Resources{isMod ? ` for ${countryState.name}` : ""}
+									</CardTitle>
+								</CardHeader>
+								<CardContent>
+									<ResourceChangeForm
+										countryState={countryState}
+										onSuccess={handleChangeSuccess}
+									/>
+								</CardContent>
+							</Card>
+						)}
+
+						{(tab === "troop-creation" || tab === "research") && (
+							<Card>
+								<CardHeader>
+									<CardTitle className="text-xl">
+										<Tooltip>
+											<TooltipTrigger
+												render={
+													<Button
+														className="mr-2"
+														onClick={() => setTab("home")}
+														size="icon"
+													>
+														<ArrowLeft />
+													</Button>
+												}
+											/>
+											<TooltipContent>Go Back</TooltipContent>
+										</Tooltip>
+										{tab === "troop-creation" ? "Troop Creation" : "Research"}
+									</CardTitle>
+								</CardHeader>
+								<CardContent>
+									<div className="flex h-40 items-center justify-center text-muted-foreground">
+										Work in progress
+									</div>
+								</CardContent>
+							</Card>
+						)}
 
 						{/* History Button */}
 						<div className="flex justify-end">

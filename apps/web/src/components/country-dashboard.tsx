@@ -2,6 +2,7 @@
 
 import {
 	CalendarClock,
+	CircleGauge,
 	CirclePause,
 	CirclePlay,
 	CircleX,
@@ -11,7 +12,6 @@ import {
 	Grip,
 	Megaphone,
 	MoveRight,
-	Pickaxe,
 	Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -251,9 +251,9 @@ export default function CountryDashboard({
 
 	const dockItems = [
 		{
-			icon: <Pickaxe size={24} />,
-			label: "Resources",
-			href: "/game/resources",
+			icon: <CircleGauge size={24} />,
+			label: "Assets",
+			href: "/game/assets",
 		},
 		{
 			icon: <Megaphone size={24} />,
