@@ -305,8 +305,6 @@ class YearScheduler {
 			.where(eq(gameStateTable.gameId, gameId));
 		if (gameState.currentYear >= newYear) return;
 
-		console.log(`Year changing to ${newYear} for game ${gameId}`);
-
 		// Update game state with new year
 		await db
 			.update(gameStateTable)
@@ -440,10 +438,6 @@ class YearScheduler {
 					population: RESOURCE_INCREMENT,
 				},
 			}),
-		);
-
-		console.log(
-			`Year changed to ${newYear} for game ${gameId}. Resources incremented by ${RESOURCE_INCREMENT}.`,
 		);
 	}
 

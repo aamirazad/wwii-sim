@@ -98,7 +98,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
 		if (!lastJsonMessage) return;
 
 		const message = lastJsonMessage;
-		console.log("WebSocket message received:", message);
 
 		// Handle country subscription confirmation
 		if (message.type === "server.country.subscribed") {

@@ -128,7 +128,6 @@ const app = new Elysia()
 		body: ClientMessageSchema,
 		response: ServerMessageSchema,
 		open(ws) {
-			console.log(`User Connected`);
 			ws.send({
 				type: "server.connected",
 				apiVersion: packageJson.version,
@@ -341,7 +340,6 @@ const app = new Elysia()
 	.post(
 		"/users",
 		async ({ body }) => {
-			console.log(`Creating user ${body.name}`);
 			const [newUser] = await db.insert(usersTable).values(body).returning();
 			return {
 				id: newUser.id,
