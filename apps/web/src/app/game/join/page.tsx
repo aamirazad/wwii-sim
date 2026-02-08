@@ -1,13 +1,14 @@
 "use client";
 
 import type { ClientMessage, Game, User } from "@api/schema";
-import { Clock, Loader2, Users } from "lucide-react";
+import { Clock, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Center from "@/components/center";
 import FullAlert from "@/components/full-alert";
 import LoadingSpinner from "@/components/loading-spinner";
+import ProfileCard from "@/components/profile-card";
 import ServerOffline from "@/components/server-offline";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -172,13 +173,24 @@ function GameWaiting({
 					<div className="text-center space-y-4">
 						{isPastStartDate ? (
 							<div className="flex flex-col items-center gap-4">
-								<p className="text-md text-muted-foreground">
-									The game should start soon!
+								<p className="text-md">
+									A mod should start the game shortly...
 								</p>
-								<Loader2 className=" animate-spin text-primary" />
+								{user.country && (
+									<ProfileCard
+										name={user.name}
+										title={user.country}
+										showUserInfo={false}
+										behindGlowEnabled={false}
+										imageFit="cover"
+										imagePosition="center"
+										cardHeight="30svh"
+										cardAspectRatio="1.25"
+									/>
+								)}
 							</div>
 						) : (
-							<>
+							<div className="flex flex-col items-center gap-4">
 								<div className="flex items-center justify-center gap-2 text-muted-foreground">
 									<Clock className="h-5 w-5" />
 									<p className="text-lg">
@@ -224,8 +236,19 @@ function GameWaiting({
 										))}
 									</div>
 								)}
-								{user.country && <div>You are playing as {user.country}</div>}
-							</>
+								{user.country && (
+									<ProfileCard
+										name={user.name}
+										title={user.country}
+										showUserInfo={false}
+										behindGlowEnabled={false}
+										imageFit="cover"
+										imagePosition="center"
+										cardHeight="30svh"
+										cardAspectRatio="1.25"
+									/>
+								)}
+							</div>
 						)}
 						{isAdmin && (
 							<div className="space-y-2">
