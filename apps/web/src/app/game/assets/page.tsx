@@ -119,7 +119,7 @@ function MenuSelectionCard({
 		<button
 			type="button"
 			onClick={onClick}
-			className="group flex h-64 flex-col items-center justify-center space-y-4 rounded-xl border-2 border-muted bg-card p-6 text-center transition-all hover:border-primary/50 hover:bg-accent/5 focus:outline-none focus:ring-2 focus:ring-primary"
+			className="cursor-pointer group flex h-64 flex-col items-center justify-center space-y-4 rounded-xl border-2 border-muted bg-card p-6 text-center transition-all hover:border-primary/50 hover:bg-accent/5 focus:outline-none focus:ring-2 focus:ring-primary"
 		>
 			<div className="rounded-full bg-primary/10 p-4 text-primary transition-colors group-hover:bg-primary/20">
 				{icon}
