@@ -5,6 +5,7 @@ import { Clock, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useGame } from "@/app/game/GameContext";
 import Center from "@/components/center";
 import FullAlert from "@/components/full-alert";
 import LoadingSpinner from "@/components/loading-spinner";
@@ -19,7 +20,6 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useGamePageGuard } from "@/hooks/useGamePageGuard";
-import { useGame } from "../GameContext";
 
 function UnauthenticatedView() {
 	const router = useRouter();

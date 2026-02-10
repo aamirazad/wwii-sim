@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Nunito_Sans } from "next/font/google";
-import Background from "@/components/background";
 import "./globals.css";
 import Script from "next/script";
 import { Providers } from "./providers";
@@ -34,9 +33,7 @@ export default function RootLayout({
 					defer
 				></Script>
 				<Providers>
-					<Background>
-						<main className="grow flex flex-col">{children}</main>
-					</Background>
+					<main className="grow flex flex-col">{children}</main>
 				</Providers>
 			</body>
 		</html>

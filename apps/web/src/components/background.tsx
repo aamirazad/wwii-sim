@@ -1,9 +1,11 @@
 import PixelBlast from "@/components/pixel-blast";
 
-export default async function Background({
+export default function Background({
 	children,
+	static: isStatic = false,
 }: Readonly<{
 	children: React.ReactNode;
+	static?: boolean;
 }>) {
 	return (
 		<>
@@ -15,11 +17,11 @@ export default async function Background({
 					patternScale={2}
 					patternDensity={1}
 					pixelSizeJitter={1}
-					enableRipples
+					enableRipples={!isStatic}
 					rippleSpeed={0.9}
 					rippleThickness={0.1}
 					rippleIntensityScale={1}
-					speed={0.1}
+					speed={isStatic ? 0 : 0.1}
 					edgeFade={0.05}
 					transparent
 				/>

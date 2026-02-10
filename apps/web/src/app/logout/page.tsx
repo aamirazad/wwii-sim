@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import Background from "@/components/background";
 import LoadingSpinner from "@/components/loading-spinner";
 
 /**
@@ -27,5 +28,9 @@ export default function LogoutPage() {
 		performLogout();
 	}, [router]);
 
-	return <LoadingSpinner />;
+	return (
+		<Background>
+			<LoadingSpinner />
+		</Background>
+	);
 }

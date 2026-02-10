@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type SubmitEvent, Suspense, useEffect, useState } from "react";
+import { useGame } from "@/app/game/GameContext";
 import CountryDashboard from "@/components/country-dashboard";
 import GoBack from "@/components/go-back";
 import LoadingSpinner from "@/components/loading-spinner";
@@ -64,7 +65,6 @@ import {
 import { useGamePageGuard } from "@/hooks/useGamePageGuard";
 import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
-import { useGame } from "../GameContext";
 
 // Countries that mods can manage
 const PLAYABLE_COUNTRIES: Country[] = [

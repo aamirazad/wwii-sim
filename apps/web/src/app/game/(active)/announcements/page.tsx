@@ -37,7 +37,7 @@ import {
 import { useGamePageGuard } from "@/hooks/useGamePageGuard";
 import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
-import { useGame } from "../GameContext";
+import { useGame } from "../../GameContext";
 
 function AnnouncementCard({
 	announcement,

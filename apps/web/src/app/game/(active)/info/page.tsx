@@ -2,7 +2,7 @@
 
 import CountryDashboard from "@/components/country-dashboard";
 import { useGamePageGuard } from "@/hooks/useGamePageGuard";
-import { useGame } from "../GameContext";
+import { useGame } from "../../GameContext";
 
 export default function GameInfo() {
 	const { gameState, userState } = useGame();

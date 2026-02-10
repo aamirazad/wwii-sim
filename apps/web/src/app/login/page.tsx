@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
+import Background from "@/components/background";
 import FullAlert from "@/components/full-alert";
 import LoadingSpinner from "@/components/loading-spinner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -64,8 +65,10 @@ function App() {
 
 export default function LoginPage() {
 	return (
-		<Suspense>
-			<App />
-		</Suspense>
+		<Background>
+			<Suspense>
+				<App />
+			</Suspense>
+		</Background>
 	);
 }
