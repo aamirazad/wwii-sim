@@ -50,6 +50,7 @@ export const CountrySchema = t.Union([
 	t.Literal("United Kingdom"),
 	t.Literal("United States"),
 	t.Literal("Mods"),
+	t.Null(),
 ]);
 
 export const PlayableCountrySchema = t.Union([

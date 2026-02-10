@@ -412,7 +412,7 @@ const app = new Elysia()
 				id: t.String(),
 			}),
 			body: t.Object({
-				country: t.Optional(CountrySchema),
+				country: CountrySchema,
 			}),
 			response: t.Union([
 				t.Object({
@@ -612,6 +612,11 @@ const app = new Elysia()
 		"/game/:gameId/country/name/:countryName",
 		async ({ params, set }) => {
 			const gameId = Number.parseInt(params.gameId, 10);
+
+			if (!params.countryName) {
+				set.status = 404;
+				return { error: true as const, message: "No country requested" };
+			}
 
 			const [country] = await db
 				.select()

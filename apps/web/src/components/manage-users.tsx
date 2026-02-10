@@ -125,7 +125,7 @@ export default function ManageUsers({ fullPage }: { fullPage?: boolean }) {
 			country,
 		}: {
 			userId: string;
-			country: Country | undefined;
+			country: Country | null;
 		}) => {
 			const authUserId = getUserId();
 			if (!authUserId) throw new Error("Unauthenticated");
@@ -324,7 +324,7 @@ function UserCard({
 	onAssignCountry,
 }: {
 	user: User;
-	onAssignCountry: (country: Country | undefined) => void;
+	onAssignCountry: (country: Country | null) => void;
 }) {
 	const [open, setOpen] = useState(false);
 	const [copy, setCopy] = useState(false);
@@ -377,7 +377,7 @@ function UserCard({
 									<CommandGroup>
 										<CommandItem
 											onSelect={() => {
-												onAssignCountry(undefined);
+												onAssignCountry(null);
 												setOpen(false);
 											}}
 										>
