@@ -60,6 +60,11 @@ export function useGamePageGuard({
 		const isMod =
 			userState.status === "authenticated" && userState.user.country === "Mods";
 
+		if (userState.status === "error") {
+			router.push("/error?e=invalid-session");
+			return;
+		}
+
 		// Handle pages that require an active game
 		if (requires === "active-game") {
 			// No game exists
