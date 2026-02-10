@@ -4,7 +4,6 @@ import {
 	DEFAULT_COUNTRY_STARTING_RESOURCES,
 	GAME_YEARS,
 	type GameYear,
-	PLAYABLE_COUNTRIES,
 	type PlayableCountry,
 } from "@api/schema";
 import { ChevronDownIcon } from "lucide-react";
@@ -39,10 +38,6 @@ interface CountryConfig {
 
 type CountriesConfig = Record<PlayableCountry, CountryConfig>;
 
-interface YearDurations {
-	[key: string]: number;
-}
-
 const DEFAULT_YEAR_DURATION = 46;
 
 export default function CreateGamePage() {
@@ -54,35 +49,18 @@ export default function CreateGamePage() {
 	// Form state
 	const [startDate, setStartDate] = useState<Date | undefined>(undefined);
 	const [startTime, setStartTime] = useState<string>("07:37:15");
-	const [yearDurations, setYearDurations] = useState<YearDurations>(() => {
-		const durations: YearDurations = {};
+	const [yearDurations, setYearDurations] = useState(() => {
+		const durations: { [key: string]: number } = {};
 		for (const year of GAME_YEARS) {
 			durations[year] = DEFAULT_YEAR_DURATION;
 		}
 		return durations;
 	});
-	const [countries, setCountries] = useState<CountriesConfig>(
-		() => DEFAULT_COUNTRY_STARTING_RESOURCES as CountriesConfig,
-	);
+	const countries = DEFAULT_COUNTRY_STARTING_RESOURCES as CountriesConfig;
 
 	const handleYearDurationChange = (year: GameYear, value: string) => {
 		const numValue = Number.parseInt(value, 10) || 0;
 		setYearDurations((prev) => ({ ...prev, [year]: numValue }));
-	};
-
-	const handleCountryResourceChange = (
-		country: PlayableCountry,
-		field: keyof CountryConfig,
-		value: string,
-	) => {
-		const numValue = Number.parseInt(value, 10) || 0;
-		setCountries((prev) => ({
-			...prev,
-			[country]: {
-				...prev[country],
-				[field]: numValue,
-			},
-		}));
 	};
 
 	const handleSubmit = async (e: React.FormEvent) => {
@@ -232,90 +210,6 @@ export default function CreateGamePage() {
 										</div>
 									))}
 								</div>
-							</div>
-						</CardContent>
-					</Card>
-
-					{/* Country Configurations */}
-					<Card>
-						<CardHeader>
-							<CardTitle>Country Configurations</CardTitle>
-							<CardDescription>
-								Configure the starting resources for each country.
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-6">
-							<div className="grid gap-6 md:grid-cols-2">
-								{PLAYABLE_COUNTRIES.map((country) => (
-									<div
-										key={country}
-										className="space-y-3 rounded-lg border p-4"
-									>
-										<h3 className="font-semibold">{country}</h3>
-										<div className="grid grid-cols-3 gap-2">
-											<div className="space-y-1">
-												<Label
-													htmlFor={`${country}-steel`}
-													className="text-[10px] uppercase text-muted-foreground"
-												>
-													Steel
-												</Label>
-												<Input
-													id={`${country}-steel`}
-													type="number"
-													value={countries[country].steel}
-													onChange={(e) =>
-														handleCountryResourceChange(
-															country,
-															"steel",
-															e.target.value,
-														)
-													}
-												/>
-											</div>
-											<div className="space-y-1">
-												<Label
-													htmlFor={`${country}-oil`}
-													className="text-[10px] uppercase text-muted-foreground"
-												>
-													Oil
-												</Label>
-												<Input
-													id={`${country}-oil`}
-													type="number"
-													value={countries[country].oil}
-													onChange={(e) =>
-														handleCountryResourceChange(
-															country,
-															"oil",
-															e.target.value,
-														)
-													}
-												/>
-											</div>
-											<div className="space-y-1">
-												<Label
-													htmlFor={`${country}-population`}
-													className="text-[10px] uppercase text-muted-foreground"
-												>
-													Population
-												</Label>
-												<Input
-													id={`${country}-population`}
-													type="number"
-													value={countries[country].population}
-													onChange={(e) =>
-														handleCountryResourceChange(
-															country,
-															"population",
-															e.target.value,
-														)
-													}
-												/>
-											</div>
-										</div>
-									</div>
-								))}
 							</div>
 						</CardContent>
 					</Card>
