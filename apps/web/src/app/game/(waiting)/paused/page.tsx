@@ -8,6 +8,7 @@ import { useGame } from "@/app/game/GameContext";
 import Center from "@/components/center";
 import FullAlert from "@/components/full-alert";
 import LoadingSpinner from "@/components/loading-spinner";
+import ProfileCard from "@/components/profile-card";
 import ServerOffline from "@/components/server-offline";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -118,7 +119,18 @@ function GamePaused({
 							<p className="text-md text-muted-foreground">
 								You will automatically rejoin when the game is unpaused.
 							</p>
-							<Loader2 className="animate-spin text-primary" />
+							{user.country && (
+								<ProfileCard
+									name={user.name}
+									title={user.country}
+									showUserInfo={false}
+									behindGlowEnabled={false}
+									imageFit="cover"
+									imagePosition="center"
+									cardHeight="30svh"
+									cardAspectRatio="1.25"
+								/>
+							)}
 						</div>
 						{(isAdmin || isMod) && (
 							<div className="space-y-2 pt-4 border-t">
