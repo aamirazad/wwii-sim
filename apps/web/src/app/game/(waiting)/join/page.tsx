@@ -185,7 +185,7 @@ function GameWaiting({
 										imageFit="cover"
 										imagePosition="center"
 										cardHeight="30svh"
-										cardAspectRatio="1.25"
+										cardAspectRatio="1.8"
 									/>
 								)}
 							</div>
@@ -245,7 +245,7 @@ function GameWaiting({
 										imageFit="cover"
 										imagePosition="center"
 										cardHeight="30svh"
-										cardAspectRatio="1.25"
+										cardAspectRatio="1.8"
 									/>
 								)}
 							</div>
