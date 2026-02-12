@@ -272,8 +272,8 @@ export default function CountryDashboard({
 		},
 		{
 			icon: <Dices size={24} />,
-			label: "Game",
-			href: "/game/info",
+			label: "Research",
+			href: "/game/research",
 		},
 	];
 
