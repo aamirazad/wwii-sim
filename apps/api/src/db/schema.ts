@@ -259,6 +259,43 @@ export const troopChangeLogTable = t.sqliteTable("troop_change_log", {
 		.notNull(),
 });
 
+export const tradeRequestTable = t.sqliteTable("trade_request", {
+	id: t.int().primaryKey({ autoIncrement: true }),
+	gameId: t
+		.int("game_id")
+		.notNull()
+		.references(() => gamesTable.id, { onDelete: "cascade" }),
+	initiatorCountryStateId: t
+		.int("initiator_country_state_id")
+		.notNull()
+		.references(() => countryStateTable.id, { onDelete: "cascade" }),
+	recipientCountryStateId: t
+		.int("recipient_country_state_id")
+		.notNull()
+		.references(() => countryStateTable.id, { onDelete: "cascade" }),
+	initiatorOil: t.int("initiator_oil").notNull().default(0),
+	initiatorSteel: t.int("initiator_steel").notNull().default(0),
+	recipientOil: t.int("recipient_oil").notNull().default(0),
+	recipientSteel: t.int("recipient_steel").notNull().default(0),
+	status: t
+		.text("status")
+		.$type<"pending" | "accepted" | "rejected">()
+		.notNull()
+		.default("pending"),
+	createdBy: t
+		.text("created_by")
+		.notNull()
+		.references(() => usersTable.id, { onDelete: "cascade" }),
+	createdAt: t
+		.integer("created_at", { mode: "timestamp" })
+		.default(sql`(strftime('%s','now'))`)
+		.notNull(),
+	updatedAt: t
+		.integer("updated_at", { mode: "timestamp" })
+		.default(sql`(strftime('%s','now'))`)
+		.notNull(),
+});
+
 // Year schedules table for persistent year change scheduling
 export const yearSchedulesTable = t.sqliteTable("year_schedules", {
 	id: t.int().primaryKey({ autoIncrement: true }),
@@ -290,6 +327,7 @@ export const table = {
 	announcementsTable,
 	troopLocationTable,
 	troopChangeLogTable,
+	tradeRequestTable,
 	yearSchedulesTable,
 } as const;
 

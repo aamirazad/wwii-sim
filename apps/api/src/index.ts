@@ -14,6 +14,7 @@ import {
 	PLAYABLE_COUNTRIES,
 	type PlayableCountry,
 	resourceChangeLogTable,
+	tradeRequestTable,
 	troopChangeLogTable,
 	troopLocationTable,
 	type UserRole,
@@ -33,6 +34,8 @@ import {
 	ServerMessageSchema,
 	TROOP_COSTS,
 	TROOP_TYPES,
+	TradeRequestSchema,
+	TradeResourcesSchema,
 	TroopChangeLogSchema,
 	TroopCountsSchema,
 	TroopLocationSchema,
@@ -41,6 +44,25 @@ import {
 	type YearDurations,
 } from "./schema";
 import { yearScheduler } from "./services/year-scheduler";
+
+const calculateTradeCosts = (resources: {
+	initiatorOil: number;
+	initiatorSteel: number;
+	recipientOil: number;
+	recipientSteel: number;
+}) => {
+	const totalResources =
+		resources.initiatorOil +
+		resources.initiatorSteel +
+		resources.recipientOil +
+		resources.recipientSteel;
+	const oilCost = Math.ceil(totalResources / 4);
+	return {
+		totalResources,
+		oilCost,
+		steelRequirement: oilCost,
+	};
+};
 
 const app = new Elysia()
 	.use(
@@ -1205,6 +1227,520 @@ const app = new Elysia()
 				summary: "Update Country Resources",
 				description:
 					"Updates country resources and logs the change with a note.",
+				tags: ["Game"],
+			},
+		},
+	)
+	.get(
+		"/game/:gameId/country/:countryId/trades",
+		async ({ params, query, set }) => {
+			const countryId = Number.parseInt(params.countryId, 10);
+			const [country] = await db
+				.select()
+				.from(countryStateTable)
+				.where(eq(countryStateTable.id, countryId));
+			if (!country) {
+				set.status = 404;
+				return { error: true as const, message: "Country not found" };
+			}
+
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			if (!user) {
+				set.status = 401;
+				return { error: true as const, message: "Unauthorized" };
+			}
+			if (user.country !== country.name && user.country !== "Mods") {
+				set.status = 403;
+				return { error: true as const, message: "Unauthorized" };
+			}
+
+			const trades = await db
+				.select()
+				.from(tradeRequestTable)
+				.where(
+					and(
+						eq(tradeRequestTable.gameId, Number.parseInt(params.gameId, 10)),
+						eq(tradeRequestTable.status, "pending"),
+						or(
+							eq(tradeRequestTable.initiatorCountryStateId, countryId),
+							eq(tradeRequestTable.recipientCountryStateId, countryId),
+						),
+					),
+				);
+
+			const relatedCountries = await db
+				.select()
+				.from(countryStateTable)
+				.where(
+					eq(countryStateTable.gameId, Number.parseInt(params.gameId, 10)),
+				);
+
+			const countryNameById = new Map(
+				relatedCountries.map((c) => [c.id, c.name]),
+			);
+			const requests = trades.map((trade) => ({
+				id: trade.id,
+				gameId: trade.gameId,
+				initiatorCountryStateId: trade.initiatorCountryStateId,
+				recipientCountryStateId: trade.recipientCountryStateId,
+				initiatorCountryName: (countryNameById.get(
+					trade.initiatorCountryStateId,
+				) ?? "Commonwealth") as Country,
+				recipientCountryName: (countryNameById.get(
+					trade.recipientCountryStateId,
+				) ?? "Commonwealth") as Country,
+				initiatorResources: {
+					oil: trade.initiatorOil,
+					steel: trade.initiatorSteel,
+				},
+				recipientResources: {
+					oil: trade.recipientOil,
+					steel: trade.recipientSteel,
+				},
+				...calculateTradeCosts({
+					initiatorOil: trade.initiatorOil,
+					initiatorSteel: trade.initiatorSteel,
+					recipientOil: trade.recipientOil,
+					recipientSteel: trade.recipientSteel,
+				}),
+				status: trade.status,
+				createdBy: trade.createdBy,
+				createdAt: trade.createdAt,
+				updatedAt: trade.updatedAt,
+			}));
+
+			return {
+				error: false as const,
+				incoming: requests.filter(
+					(trade) => trade.recipientCountryStateId === countryId,
+				),
+				outgoing: requests.filter(
+					(trade) => trade.initiatorCountryStateId === countryId,
+				),
+			};
+		},
+		{
+			params: t.Object({ gameId: t.String(), countryId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					incoming: t.Array(TradeRequestSchema),
+					outgoing: t.Array(TradeRequestSchema),
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Get Country Trades",
+				description: "Returns incoming and outgoing pending trade requests.",
+				tags: ["Game"],
+			},
+		},
+	)
+	.post(
+		"/game/:gameId/country/:countryId/trades",
+		async ({ params, query, body, set }) => {
+			const countryId = Number.parseInt(params.countryId, 10);
+			const gameId = Number.parseInt(params.gameId, 10);
+			const [initiator] = await db
+				.select()
+				.from(countryStateTable)
+				.where(eq(countryStateTable.id, countryId));
+			if (!initiator) {
+				set.status = 404;
+				return { error: true as const, message: "Country not found" };
+			}
+
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			if (!user) {
+				set.status = 401;
+				return { error: true as const, message: "Unauthorized" };
+			}
+			if (user.country !== initiator.name && user.country !== "Mods") {
+				set.status = 403;
+				return { error: true as const, message: "Unauthorized" };
+			}
+
+			const [recipient] = await db
+				.select()
+				.from(countryStateTable)
+				.where(
+					and(
+						eq(countryStateTable.gameId, gameId),
+						eq(countryStateTable.name, body.recipientCountryName),
+					),
+				);
+			if (!recipient) {
+				set.status = 404;
+				return { error: true as const, message: "Recipient country not found" };
+			}
+			if (recipient.id === initiator.id) {
+				set.status = 400;
+				return { error: true as const, message: "Cannot trade with yourself" };
+			}
+			if (
+				body.initiatorResources.oil < 0 ||
+				body.initiatorResources.steel < 0 ||
+				body.recipientResources.oil < 0 ||
+				body.recipientResources.steel < 0
+			) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: "Trade resource values cannot be negative",
+				};
+			}
+
+			const { totalResources, steelRequirement } = calculateTradeCosts({
+				initiatorOil: body.initiatorResources.oil,
+				initiatorSteel: body.initiatorResources.steel,
+				recipientOil: body.recipientResources.oil,
+				recipientSteel: body.recipientResources.steel,
+			});
+
+			if (totalResources <= 0) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: "Trade must include resources",
+				};
+			}
+
+			if (initiator.steel < steelRequirement) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: `Not enough steel to initiate trade (requires ${steelRequirement})`,
+				};
+			}
+
+			await db.insert(tradeRequestTable).values({
+				gameId,
+				initiatorCountryStateId: initiator.id,
+				recipientCountryStateId: recipient.id,
+				initiatorOil: body.initiatorResources.oil,
+				initiatorSteel: body.initiatorResources.steel,
+				recipientOil: body.recipientResources.oil,
+				recipientSteel: body.recipientResources.steel,
+				status: "pending",
+				createdBy: user.id,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			});
+
+			return { error: false as const };
+		},
+		{
+			params: t.Object({ gameId: t.String(), countryId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+			body: t.Object({
+				recipientCountryName: PlayableCountrySchema,
+				initiatorResources: TradeResourcesSchema,
+				recipientResources: TradeResourcesSchema,
+			}),
+			response: t.Union([t.Object({ error: t.Literal(false) }), ErrorSchema]),
+			detail: {
+				summary: "Create Trade Request",
+				description:
+					"Creates a pending trade request from one country to another.",
+				tags: ["Game"],
+			},
+		},
+	)
+	.post(
+		"/game/:gameId/country/:countryId/trades/accept",
+		async ({ params, query, body, set }) => {
+			const gameId = Number.parseInt(params.gameId, 10);
+			const countryId = Number.parseInt(params.countryId, 10);
+
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			if (!user) {
+				set.status = 401;
+				return { error: true as const, message: "Unauthorized" };
+			}
+
+			const tradeOutcome = await db.transaction(async (tx) => {
+				const [trade] = await tx
+					.select()
+					.from(tradeRequestTable)
+					.where(
+						and(
+							eq(tradeRequestTable.id, body.tradeId),
+							eq(tradeRequestTable.gameId, gameId),
+							eq(tradeRequestTable.status, "pending"),
+						),
+					);
+				if (!trade) return { error: "Trade request not found" } as const;
+				if (trade.recipientCountryStateId !== countryId) {
+					return { error: "Only the recipient can accept this trade" } as const;
+				}
+
+				const [initiator] = await tx
+					.select()
+					.from(countryStateTable)
+					.where(eq(countryStateTable.id, trade.initiatorCountryStateId));
+				const [recipient] = await tx
+					.select()
+					.from(countryStateTable)
+					.where(eq(countryStateTable.id, trade.recipientCountryStateId));
+
+				if (!initiator || !recipient) {
+					return { error: "Country not found for trade" } as const;
+				}
+				if (user.country !== recipient.name && user.country !== "Mods") {
+					return { error: "Unauthorized" } as const;
+				}
+
+				const { oilCost, steelRequirement } = calculateTradeCosts({
+					initiatorOil: trade.initiatorOil,
+					initiatorSteel: trade.initiatorSteel,
+					recipientOil: trade.recipientOil,
+					recipientSteel: trade.recipientSteel,
+				});
+
+				if (initiator.oil < trade.initiatorOil + oilCost) {
+					return {
+						error: "Initiating country does not have enough oil",
+					} as const;
+				}
+				if (
+					initiator.steel < trade.initiatorSteel ||
+					initiator.steel < steelRequirement
+				) {
+					return {
+						error: "Initiating country does not meet steel requirements",
+					} as const;
+				}
+				if (recipient.oil < trade.recipientOil) {
+					return {
+						error: "Recipient country does not have enough oil",
+					} as const;
+				}
+				if (recipient.steel < trade.recipientSteel) {
+					return {
+						error: "Recipient country does not have enough steel",
+					} as const;
+				}
+
+				const [updatedInitiator] = await tx
+					.update(countryStateTable)
+					.set({
+						oil:
+							initiator.oil - trade.initiatorOil - oilCost + trade.recipientOil,
+						steel:
+							initiator.steel - trade.initiatorSteel + trade.recipientSteel,
+						updatedAt: new Date(),
+					})
+					.where(eq(countryStateTable.id, initiator.id))
+					.returning();
+				const [updatedRecipient] = await tx
+					.update(countryStateTable)
+					.set({
+						oil: recipient.oil - trade.recipientOil + trade.initiatorOil,
+						steel:
+							recipient.steel - trade.recipientSteel + trade.initiatorSteel,
+						updatedAt: new Date(),
+					})
+					.where(eq(countryStateTable.id, recipient.id))
+					.returning();
+
+				const tradeSummary = `Trade with ${recipient.name}: sent ${trade.initiatorSteel} steel and ${trade.initiatorOil} oil, received ${trade.recipientSteel} steel and ${trade.recipientOil} oil, paid ${oilCost} oil trade cost`;
+				const recipientSummary = `Trade with ${initiator.name}: sent ${trade.recipientSteel} steel and ${trade.recipientOil} oil, received ${trade.initiatorSteel} steel and ${trade.initiatorOil} oil`;
+
+				const initiatorDeltas = [
+					{
+						type: "oil" as const,
+						prev: initiator.oil,
+						curr: updatedInitiator.oil,
+						note: tradeSummary,
+					},
+					{
+						type: "steel" as const,
+						prev: initiator.steel,
+						curr: updatedInitiator.steel,
+						note: tradeSummary,
+					},
+				];
+				const recipientDeltas = [
+					{
+						type: "oil" as const,
+						prev: recipient.oil,
+						curr: updatedRecipient.oil,
+						note: recipientSummary,
+					},
+					{
+						type: "steel" as const,
+						prev: recipient.steel,
+						curr: updatedRecipient.steel,
+						note: recipientSummary,
+					},
+				];
+
+				for (const delta of initiatorDeltas) {
+					if (delta.prev === delta.curr) continue;
+					await tx.insert(resourceChangeLogTable).values({
+						countryStateId: initiator.id,
+						gameId,
+						resourceType: delta.type,
+						previousValue: delta.prev,
+						newValue: delta.curr,
+						note: delta.note,
+						changedBy: user.name,
+						createdAt: new Date(),
+					});
+				}
+				for (const delta of recipientDeltas) {
+					if (delta.prev === delta.curr) continue;
+					await tx.insert(resourceChangeLogTable).values({
+						countryStateId: recipient.id,
+						gameId,
+						resourceType: delta.type,
+						previousValue: delta.prev,
+						newValue: delta.curr,
+						note: delta.note,
+						changedBy: user.name,
+						createdAt: new Date(),
+					});
+				}
+
+				await tx
+					.update(tradeRequestTable)
+					.set({ status: "accepted", updatedAt: new Date() })
+					.where(eq(tradeRequestTable.id, trade.id));
+
+				return {
+					error: null,
+					initiatorName: initiator.name as Country,
+					recipientName: recipient.name as Country,
+					initiatorResources: {
+						oil: updatedInitiator.oil,
+						steel: updatedInitiator.steel,
+						population: updatedInitiator.population,
+					},
+					recipientResources: {
+						oil: updatedRecipient.oil,
+						steel: updatedRecipient.steel,
+						population: updatedRecipient.population,
+					},
+				} as const;
+			});
+
+			if (tradeOutcome.error) {
+				set.status = tradeOutcome.error === "Unauthorized" ? 403 : 400;
+				return { error: true as const, message: tradeOutcome.error };
+			}
+
+			app.server?.publish(
+				`country:${tradeOutcome.initiatorName}`,
+				JSON.stringify({
+					type: "server.country.resources",
+					country: tradeOutcome.initiatorName,
+					resources: tradeOutcome.initiatorResources,
+				}),
+			);
+			app.server?.publish(
+				`country:${tradeOutcome.recipientName}`,
+				JSON.stringify({
+					type: "server.country.resources",
+					country: tradeOutcome.recipientName,
+					resources: tradeOutcome.recipientResources,
+				}),
+			);
+
+			return { error: false as const };
+		},
+		{
+			params: t.Object({ gameId: t.String(), countryId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+			body: t.Object({
+				tradeId: t.Number(),
+			}),
+			response: t.Union([t.Object({ error: t.Literal(false) }), ErrorSchema]),
+			detail: {
+				summary: "Accept Trade Request",
+				description:
+					"Accepts a pending trade request and applies resource transfers.",
+				tags: ["Game"],
+			},
+		},
+	)
+	.post(
+		"/game/:gameId/country/:countryId/trades/reject",
+		async ({ params, query, body, set }) => {
+			const gameId = Number.parseInt(params.gameId, 10);
+			const countryId = Number.parseInt(params.countryId, 10);
+
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			if (!user) {
+				set.status = 401;
+				return { error: true as const, message: "Unauthorized" };
+			}
+
+			const [trade] = await db
+				.select()
+				.from(tradeRequestTable)
+				.where(
+					and(
+						eq(tradeRequestTable.id, body.tradeId),
+						eq(tradeRequestTable.gameId, gameId),
+						eq(tradeRequestTable.status, "pending"),
+					),
+				);
+			if (!trade) {
+				set.status = 404;
+				return { error: true as const, message: "Trade request not found" };
+			}
+
+			if (trade.recipientCountryStateId !== countryId) {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only the recipient can reject this trade",
+				};
+			}
+
+			const [recipient] = await db
+				.select()
+				.from(countryStateTable)
+				.where(eq(countryStateTable.id, countryId));
+			if (!recipient) {
+				set.status = 404;
+				return { error: true as const, message: "Country not found" };
+			}
+			if (user.country !== recipient.name && user.country !== "Mods") {
+				set.status = 403;
+				return { error: true as const, message: "Unauthorized" };
+			}
+
+			await db
+				.update(tradeRequestTable)
+				.set({ status: "rejected", updatedAt: new Date() })
+				.where(eq(tradeRequestTable.id, trade.id));
+
+			return { error: false as const };
+		},
+		{
+			params: t.Object({ gameId: t.String(), countryId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+			body: t.Object({
+				tradeId: t.Number(),
+			}),
+			response: t.Union([t.Object({ error: t.Literal(false) }), ErrorSchema]),
+			detail: {
+				summary: "Reject Trade Request",
+				description: "Rejects a pending trade request.",
 				tags: ["Game"],
 			},
 		},

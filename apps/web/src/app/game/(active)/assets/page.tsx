@@ -4,6 +4,7 @@ import type {
 	Country,
 	CountryState,
 	ResourceChangeLog,
+	TradeRequest,
 	TroopCounts,
 	TroopLocation,
 	TroopType,
@@ -16,10 +17,10 @@ import {
 } from "@api/schema";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-	Beaker,
 	Droplets,
 	Factory,
 	Hammer,
+	Handshake,
 	History,
 	MapPin,
 	Minus,
@@ -372,10 +373,14 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
-			<DialogTrigger render={<Button variant="outline" />}>
-				<History className="mr-2 h-4 w-4" />
-				View Resource Change History
-			</DialogTrigger>
+			<DialogTrigger
+				render={
+					<Button variant="outline">
+						<History className="mr-2 h-4 w-4" />
+						View Resource Change History
+					</Button>
+				}
+			></DialogTrigger>
 			<DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
 				<DialogHeader>
 					<DialogTitle>Resource Change History</DialogTitle>
@@ -465,6 +470,330 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 				<DialogFooter showCloseButton />
 			</DialogContent>
 		</Dialog>
+	);
+}
+
+function TradingForm({
+	countryState,
+	isMod,
+	onSuccess,
+}: {
+	countryState: CountryState;
+	isMod: boolean;
+	onSuccess: () => void;
+}) {
+	const userId = getUserId();
+	const [recipientCountryName, setRecipientCountryName] = useState<
+		Country | ""
+	>("");
+	const [initiatorOil, setInitiatorOil] = useState("");
+	const [initiatorSteel, setInitiatorSteel] = useState("");
+	const [recipientOil, setRecipientOil] = useState("");
+	const [recipientSteel, setRecipientSteel] = useState("");
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	const { data: tradeData, refetch } = useQuery({
+		queryKey: ["trades", countryState.id],
+		queryFn: async () => {
+			if (!userId) throw new Error("Unauthenticated");
+			const response = await api
+				.game({ gameId: String(countryState.gameId) })
+				.country({ countryId: String(countryState.id) })
+				.trades.get({ query: { authorization: userId } });
+			if (response.error) throw new Error("Failed to fetch trades");
+			return response.data;
+		},
+		enabled: !!userId,
+		staleTime: 10000,
+	});
+
+	const initiatorOilValue = initiatorOil
+		? Number.parseInt(initiatorOil, 10)
+		: 0;
+	const initiatorSteelValue = initiatorSteel
+		? Number.parseInt(initiatorSteel, 10)
+		: 0;
+	const recipientOilValue = recipientOil
+		? Number.parseInt(recipientOil, 10)
+		: 0;
+	const recipientSteelValue = recipientSteel
+		? Number.parseInt(recipientSteel, 10)
+		: 0;
+	const totalResources =
+		initiatorOilValue +
+		initiatorSteelValue +
+		recipientOilValue +
+		recipientSteelValue;
+	const tradeCost = Math.ceil(totalResources / 4);
+
+	const handleCreateTrade = async (e: SubmitEvent<HTMLFormElement>) => {
+		e.preventDefault();
+		if (!userId || !recipientCountryName) return;
+		if (recipientCountryName === "Mods") {
+			setError("Cannot trade with Mods");
+			return;
+		}
+		if (recipientCountryName && recipientCountryName !== countryState.name) {
+			// Valid country selected
+		} else {
+			setError("Please select a valid recipient country");
+			return;
+		}
+		if (
+			initiatorOilValue < 0 ||
+			initiatorSteelValue < 0 ||
+			recipientOilValue < 0 ||
+			recipientSteelValue < 0
+		) {
+			setError("Trade amounts cannot be negative");
+			return;
+		}
+		if (totalResources <= 0) {
+			setError("Trade must include at least one resource");
+			return;
+		}
+
+		setIsSubmitting(true);
+		setError(null);
+		try {
+			const response = await api
+				.game({ gameId: String(countryState.gameId) })
+				.country({ countryId: String(countryState.id) })
+				.trades.post(
+					{
+						recipientCountryName,
+						initiatorResources: {
+							oil: initiatorOilValue,
+							steel: initiatorSteelValue,
+						},
+						recipientResources: {
+							oil: recipientOilValue,
+							steel: recipientSteelValue,
+						},
+					},
+					{ query: { authorization: userId } },
+				);
+			if (response.error) {
+				setError(response.error.value.message ?? "Failed to create trade");
+				return;
+			}
+			setRecipientCountryName("");
+			setInitiatorOil("");
+			setInitiatorSteel("");
+			setRecipientOil("");
+			setRecipientSteel("");
+			refetch();
+			onSuccess();
+		} catch {
+			setError("Failed to create trade");
+		} finally {
+			setIsSubmitting(false);
+		}
+	};
+
+	const respondToTrade = async (
+		tradeId: number,
+		action: "accept" | "reject",
+	) => {
+		if (!userId) return;
+		setError(null);
+		const request =
+			action === "accept"
+				? api
+						.game({ gameId: String(countryState.gameId) })
+						.country({ countryId: String(countryState.id) })
+						.trades.accept.post(
+							{ tradeId },
+							{ query: { authorization: userId } },
+						)
+				: api
+						.game({ gameId: String(countryState.gameId) })
+						.country({ countryId: String(countryState.id) })
+						.trades.reject.post(
+							{ tradeId },
+							{ query: { authorization: userId } },
+						);
+		const response = await request;
+		if (response.error) {
+			setError(response.error.value.message ?? `Failed to ${action} trade`);
+			return;
+		}
+		refetch();
+		onSuccess();
+	};
+
+	const incoming = tradeData && !tradeData.error ? tradeData.incoming : [];
+	const outgoing = tradeData && !tradeData.error ? tradeData.outgoing : [];
+	const recipientOptions = PLAYABLE_COUNTRIES.filter(
+		(country) => country !== countryState.name,
+	);
+
+	return (
+		<div className="space-y-6">
+			<Card>
+				<CardHeader>
+					<CardTitle className="text-lg">
+						Create Trade Request{isMod ? ` for ${countryState.name}` : ""}
+					</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<form onSubmit={handleCreateTrade} className="space-y-4">
+						<div className="space-y-2">
+							<Label>Trade With</Label>
+							<Select
+								value={recipientCountryName}
+								onValueChange={(value) =>
+									setRecipientCountryName(value as Country)
+								}
+							>
+								<SelectTrigger>
+									<SelectValue placeholder="Select recipient country" />
+								</SelectTrigger>
+								<SelectContent>
+									{recipientOptions.map((country) => (
+										<SelectItem key={country} value={country}>
+											{country}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+						<div className="grid grid-cols-2 gap-4">
+							<div className="space-y-2">
+								<Label>Oil you send</Label>
+								<Input
+									type="number"
+									min={0}
+									value={initiatorOil}
+									onChange={(e) => setInitiatorOil(e.target.value)}
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label>Steel you send</Label>
+								<Input
+									type="number"
+									min={0}
+									value={initiatorSteel}
+									onChange={(e) => setInitiatorSteel(e.target.value)}
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label>Oil you receive</Label>
+								<Input
+									type="number"
+									min={0}
+									value={recipientOil}
+									onChange={(e) => setRecipientOil(e.target.value)}
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label>Steel you receive</Label>
+								<Input
+									type="number"
+									min={0}
+									value={recipientSteel}
+									onChange={(e) => setRecipientSteel(e.target.value)}
+								/>
+							</div>
+						</div>
+						<p className="text-sm text-muted-foreground">
+							Trade fee: {tradeCost} oil (paid by initiator on acceptance).
+							Steel requirement to initiate: {tradeCost}.
+						</p>
+						{error && <p className="text-sm text-destructive">{error}</p>}
+						<Button
+							type="submit"
+							disabled={
+								!recipientCountryName || totalResources <= 0 || isSubmitting
+							}
+						>
+							{isSubmitting ? "Submitting..." : "Send Trade Request"}
+						</Button>
+					</form>
+				</CardContent>
+			</Card>
+
+			<div className="grid gap-6 md:grid-cols-2">
+				<Card>
+					<CardHeader>
+						<CardTitle className="text-lg">Incoming Requests</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-3">
+						{incoming.length === 0 && (
+							<p className="text-sm text-muted-foreground">
+								No incoming requests.
+							</p>
+						)}
+						{incoming.map((trade) => (
+							<TradeRequestCard
+								key={trade.id}
+								trade={trade}
+								actionLabel="Accept"
+								onPrimaryAction={() => respondToTrade(trade.id, "accept")}
+								onSecondaryAction={() => respondToTrade(trade.id, "reject")}
+							/>
+						))}
+					</CardContent>
+				</Card>
+				<Card>
+					<CardHeader>
+						<CardTitle className="text-lg">Outgoing Requests</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-3">
+						{outgoing.length === 0 && (
+							<p className="text-sm text-muted-foreground">
+								No outgoing requests.
+							</p>
+						)}
+						{outgoing.map((trade) => (
+							<TradeRequestCard key={trade.id} trade={trade} />
+						))}
+					</CardContent>
+				</Card>
+			</div>
+		</div>
+	);
+}
+
+function TradeRequestCard({
+	trade,
+	actionLabel,
+	onPrimaryAction,
+	onSecondaryAction,
+}: {
+	trade: TradeRequest;
+	actionLabel?: string;
+	onPrimaryAction?: () => void;
+	onSecondaryAction?: () => void;
+}) {
+	return (
+		<div className="rounded-lg border p-3 space-y-2">
+			<div className="text-sm font-medium">
+				{trade.initiatorCountryName} → {trade.recipientCountryName}
+			</div>
+			<div className="text-xs text-muted-foreground">
+				Sends: {trade.initiatorResources.steel} steel,{" "}
+				{trade.initiatorResources.oil} oil
+			</div>
+			<div className="text-xs text-muted-foreground">
+				Receives: {trade.recipientResources.steel} steel,{" "}
+				{trade.recipientResources.oil} oil
+			</div>
+			<div className="text-xs text-muted-foreground">
+				Fee: {trade.oilCost} oil, Steel requirement: {trade.steelRequirement}
+			</div>
+			{onPrimaryAction && onSecondaryAction && (
+				<div className="flex gap-2 pt-1">
+					<Button size="sm" onClick={onPrimaryAction}>
+						{actionLabel ?? "Accept"}
+					</Button>
+					<Button size="sm" variant="outline" onClick={onSecondaryAction}>
+						Reject
+					</Button>
+				</div>
+			)}
+		</div>
 	);
 }
 
@@ -1125,10 +1454,14 @@ function TroopHistoryDialog({ countryState }: { countryState: CountryState }) {
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
-			<DialogTrigger render={<Button variant="outline" />}>
-				<History className="mr-2 h-4 w-4" />
-				View Troop History
-			</DialogTrigger>
+			<DialogTrigger
+				render={
+					<Button variant="outline">
+						<History className="mr-2 h-4 w-4" />
+						View Troop History
+					</Button>
+				}
+			></DialogTrigger>
 			<DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
 				<DialogHeader>
 					<DialogTitle>Troop History</DialogTitle>
@@ -1209,26 +1542,19 @@ function Assets() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 
-	enum Tabs {
-		ChangeResources = "change-resources",
-		TroopCreation = "troop-creation",
-		Research = "research",
-		Home = "home",
-	}
-
-	const [tab, setTab] = useState<Tabs>(Tabs.Home);
+	const [tab, setTab] = useState<string>("home");
 
 	// Sync tab state with URL query parameter
 	useEffect(() => {
 		const tabParam = searchParams.get("tab");
-		if (tabParam && Object.values(Tabs).includes(tabParam as Tabs)) {
-			setTab(tabParam as Tabs);
+		if (tabParam) {
+			setTab(tabParam);
 		} else {
-			setTab(Tabs.Home);
+			setTab("home");
 		}
 	}, [searchParams]);
 
-	const setPageTab = (newTab: Tabs) => {
+	const setPageTab = (newTab: string) => {
 		router.push(`/game/assets?tab=${newTab}`);
 	};
 
@@ -1274,6 +1600,7 @@ function Assets() {
 			queryClient.invalidateQueries({ queryKey: ["country-history"] });
 			queryClient.invalidateQueries({ queryKey: ["troops"] });
 			queryClient.invalidateQueries({ queryKey: ["troop-history"] });
+			queryClient.invalidateQueries({ queryKey: ["trades"] });
 			// For mods viewing a different country, we need to refetch since they don't get WS updates for that country
 			if (isMod) {
 				refetchCountry();
@@ -1335,6 +1662,7 @@ function Assets() {
 	const handleChangeSuccess = () => {
 		refetchCountry();
 		queryClient.invalidateQueries({ queryKey: ["country-history"] });
+		queryClient.invalidateQueries({ queryKey: ["trades"] });
 	};
 
 	const troopLocations =
@@ -1405,19 +1733,19 @@ function Assets() {
 									title="Resources"
 									description="Adjust resource amounts."
 									icon={<Pickaxe className="h-8 w-8" />}
-									onClick={() => setPageTab(Tabs.ChangeResources)}
+									onClick={() => setPageTab("change-resources")}
 								/>
 								<MenuSelectionCard
 									title="Troops"
 									description="Build and manage your military force."
 									icon={<Factory className="h-8 w-8" />}
-									onClick={() => setPageTab(Tabs.TroopCreation)}
+									onClick={() => setPageTab("troop-creation")}
 								/>
 								<MenuSelectionCard
-									title="Research"
-									description="Develop your country."
-									icon={<Beaker className="h-8 w-8" />}
-									onClick={() => setPageTab(Tabs.Research)}
+									title="Trading"
+									description="Trade oil and steel with other countries."
+									icon={<Handshake className="h-8 w-8" />}
+									onClick={() => setPageTab("trading")}
 								/>
 							</div>
 						)}
@@ -1427,7 +1755,7 @@ function Assets() {
 							<Card>
 								<CardHeader>
 									<CardTitle className="text-xl">
-										<GoBack onClick={() => setPageTab(Tabs.Home)} />
+										<GoBack onClick={() => setPageTab("home")} />
 										Change Resources{isMod ? ` for ${countryState.name}` : ""}
 									</CardTitle>
 								</CardHeader>
@@ -1445,7 +1773,7 @@ function Assets() {
 								<Card>
 									<CardHeader>
 										<CardTitle className="text-xl">
-											<GoBack onClick={() => setPageTab(Tabs.Home)} />
+											<GoBack onClick={() => setPageTab("home")} />
 											Purchase Troops
 											{isMod ? ` for ${countryState.name}` : ""}
 										</CardTitle>
@@ -1477,18 +1805,20 @@ function Assets() {
 							</div>
 						)}
 
-						{tab === "research" && (
+						{tab === "trading" && (
 							<Card>
 								<CardHeader>
 									<CardTitle className="text-xl">
-										<GoBack onClick={() => setPageTab(Tabs.Home)} />
-										Research
+										<GoBack onClick={() => setPageTab("home")} />
+										Trading
 									</CardTitle>
 								</CardHeader>
 								<CardContent>
-									<div className="flex h-40 items-center justify-center text-muted-foreground">
-										Work in progress
-									</div>
+									<TradingForm
+										countryState={countryState}
+										isMod={isMod}
+										onSuccess={handleChangeSuccess}
+									/>
 								</CardContent>
 							</Card>
 						)}

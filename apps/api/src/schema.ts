@@ -179,6 +179,11 @@ export const ResourceTypeSchema = t.Union([
 	t.Literal("population"),
 ]);
 
+export const TradeResourceTypeSchema = t.Union([
+	t.Literal("oil"),
+	t.Literal("steel"),
+]);
+
 export const UserSchema = t.Object({
 	id: t.String(),
 	username: t.String(),
@@ -295,6 +300,39 @@ export const ResourceChangeLogSchema = t.Object({
 });
 
 export type ResourceChangeLog = Static<typeof ResourceChangeLogSchema>;
+
+export const TradeResourcesSchema = t.Object({
+	oil: t.Number(),
+	steel: t.Number(),
+});
+
+export type TradeResources = Static<typeof TradeResourcesSchema>;
+
+export const TradeRequestStatusSchema = t.Union([
+	t.Literal("pending"),
+	t.Literal("accepted"),
+	t.Literal("rejected"),
+]);
+
+export const TradeRequestSchema = t.Object({
+	id: t.Number(),
+	gameId: t.Number(),
+	initiatorCountryStateId: t.Number(),
+	recipientCountryStateId: t.Number(),
+	initiatorCountryName: CountrySchema,
+	recipientCountryName: CountrySchema,
+	initiatorResources: TradeResourcesSchema,
+	recipientResources: TradeResourcesSchema,
+	totalResources: t.Number(),
+	oilCost: t.Number(),
+	steelRequirement: t.Number(),
+	status: TradeRequestStatusSchema,
+	createdBy: t.String(),
+	createdAt: t.Date(),
+	updatedAt: t.Date(),
+});
+
+export type TradeRequest = Static<typeof TradeRequestSchema>;
 
 export const AnnouncementSchema = t.Object({
 	id: t.Number(),
