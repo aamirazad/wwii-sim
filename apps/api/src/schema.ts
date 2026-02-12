@@ -111,11 +111,6 @@ export const ServerMessageSchema = t.Union([
 	t.Object({
 		type: t.Literal("server.year.changed"),
 		year: t.Number(),
-		resourceChanges: t.Object({
-			oil: t.Number(),
-			steel: t.Number(),
-			population: t.Number(),
-		}),
 	}),
 	t.Object({
 		type: t.Literal("server.game.ended"),

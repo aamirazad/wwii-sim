@@ -1,19 +1,12 @@
 "use client";
-import { Calendar, Droplets, Hammer, Users } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Calendar } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useGame } from "@/app/game/GameContext";
-
-interface ResourceChange {
-	oil: number;
-	steel: number;
-	population: number;
-}
 
 export function NewYearDialog() {
 	const { subscribeToMessage, refetchGame } = useGame();
 	const [open, setOpen] = useState(false);
 	const [newYear, setNewYear] = useState<number | null>(null);
-	const [changes, setChanges] = useState<ResourceChange | null>(null);
 
 	// Lock closing for 3 seconds after opening
 	const [canClose, setCanClose] = useState(false);
@@ -24,7 +17,6 @@ export function NewYearDialog() {
 			if (msg.type === "server.year.changed") {
 				setNewYear(msg.year);
 
-				setChanges(msg.resourceChanges);
 				setOpen(true);
 				setCanClose(false);
 				// Immediately refetch game state to update year
@@ -75,48 +67,7 @@ export function NewYearDialog() {
 		}
 	}, [open]);
 
-	const items = useMemo(() => {
-		if (!changes) return [];
-		return [
-			{
-				key: "steel",
-				label: "Steel",
-				icon: Hammer,
-				value: changes.steel,
-				accent: "text-zinc-700 dark:text-zinc-200",
-				bg: "bg-zinc-50/80 dark:bg-zinc-950/30",
-				ring: "ring-zinc-200/70 dark:ring-zinc-800/60",
-			},
-			{
-				key: "oil",
-				label: "Oil",
-				icon: Droplets,
-				value: changes.oil,
-				accent: "text-sky-600",
-				bg: "bg-sky-50/80 dark:bg-sky-950/30",
-				ring: "ring-sky-200/70 dark:ring-sky-900/60",
-			},
-			{
-				key: "population",
-				label: "Population",
-				icon: Users,
-				value: changes.population,
-				accent: "text-emerald-700 dark:text-emerald-300",
-				bg: "bg-emerald-50/80 dark:bg-emerald-950/30",
-				ring: "ring-emerald-200/70 dark:ring-emerald-900/60",
-			},
-		] as const;
-	}, [changes]);
-
-	const formatDelta = (n: number) => (n > 0 ? `+${n}` : `${n}`);
-	const deltaTone = (n: number) =>
-		n > 0
-			? "text-emerald-700 dark:text-emerald-300"
-			: n < 0
-				? "text-rose-700 dark:text-rose-300"
-				: "text-zinc-600 dark:text-zinc-400";
-
-	if (!open || newYear == null || !changes) return null;
+	if (!open || newYear == null) return null;
 
 	return (
 		<div
@@ -167,36 +118,8 @@ export function NewYearDialog() {
 				{/* Content */}
 				<div className="px-6 pb-6">
 					<p className="text-sm italic py-3">
-						You level up in every category. As a result, you are given the
-						following resources.
+						Make sure to increase your levels and add your resources.
 					</p>
-					<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-						{items.map((it) => {
-							const Icon = it.icon;
-							return (
-								<div
-									key={it.key}
-									className={`rounded-xl p-4 ring-1 ${it.bg} ${it.ring}`}
-								>
-									<div className="flex items-center justify-between">
-										<div className="flex items-center gap-2">
-											<Icon className={`h-5 w-5 ${it.accent}`} />
-											<span className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
-												{it.label}
-											</span>
-										</div>
-										<span
-											className={`text-sm font-semibold tabular-nums ${deltaTone(
-												it.value,
-											)}`}
-										>
-											{formatDelta(it.value)}
-										</span>
-									</div>
-								</div>
-							);
-						})}
-					</div>
 					<div className="mt-6 flex items-center justify-end gap-3">
 						<button
 							type="button"

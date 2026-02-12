@@ -1,17 +1,8 @@
 import { and, eq, gt, or } from "drizzle-orm";
 import type { App } from "..";
 import { db } from "../db";
-import {
-	type Country,
-	countryStateTable,
-	gameStateTable,
-	gamesTable,
-	resourceChangeLogTable,
-	troopLocationTable,
-	yearSchedulesTable,
-} from "../db/schema";
+import { gameStateTable, gamesTable, yearSchedulesTable } from "../db/schema";
 import type { YearDurations } from "../schema";
-import { TROOP_TYPES } from "../schema";
 
 const GAME_YEARS = [1938, 1939, 1940, 1941, 1942, 1943, 1944] as const;
 
@@ -314,129 +305,12 @@ class YearScheduler {
 			})
 			.where(eq(gameStateTable.gameId, gameId));
 
-		// Get all countries for this game
-		const countries = await db
-			.select()
-			.from(countryStateTable)
-			.where(eq(countryStateTable.gameId, gameId));
-
-		// Update resources for each country (+1 oil, steel, population)
-		const RESOURCE_INCREMENT = 1;
-
-		for (const country of countries) {
-			const newOil = country.oil + RESOURCE_INCREMENT;
-			const newSteel = country.steel + RESOURCE_INCREMENT;
-			const newPopulation = country.population + RESOURCE_INCREMENT;
-
-			// Calculate occupation cost: 1 oil per troop in non-home locations
-			const occupiedLocations = await db
-				.select()
-				.from(troopLocationTable)
-				.where(
-					and(
-						eq(troopLocationTable.countryStateId, country.id),
-						eq(troopLocationTable.isHome, false),
-					),
-				);
-
-			let occupationCost = 0;
-			for (const loc of occupiedLocations) {
-				for (const tt of TROOP_TYPES) {
-					occupationCost += loc[tt];
-				}
-			}
-
-			const finalOil = newOil - occupationCost;
-
-			// Update country resources
-			await db
-				.update(countryStateTable)
-				.set({
-					oil: finalOil,
-					steel: newSteel,
-					population: newPopulation,
-					updatedAt: new Date(),
-				})
-				.where(eq(countryStateTable.id, country.id));
-
-			// Log resource changes
-			const oilNote =
-				occupationCost > 0
-					? `Year ${newYear} (+${RESOURCE_INCREMENT} income, -${occupationCost} occupation)`
-					: `Year ${newYear}`;
-
-			const resources = [
-				{
-					type: "oil" as const,
-					oldValue: country.oil,
-					newValue: finalOil,
-				},
-				{
-					type: "steel" as const,
-					oldValue: country.steel,
-					newValue: newSteel,
-				},
-				{
-					type: "population" as const,
-					oldValue: country.population,
-					newValue: newPopulation,
-				},
-			];
-
-			for (const resource of resources) {
-				await db.insert(resourceChangeLogTable).values({
-					countryStateId: country.id,
-					gameId,
-					resourceType: resource.type,
-					previousValue: resource.oldValue,
-					newValue: resource.newValue,
-					note: resource.type === "oil" ? oilNote : `Year ${newYear}`,
-					changedBy: "system",
-					createdAt: new Date(),
-				});
-			}
-
-			// Broadcast new year message to country subscribers
-			const countryName = country.name as Country;
-			this.app?.server?.publish(
-				`country:${countryName}`,
-				JSON.stringify({
-					type: "server.year.changed",
-					year: newYear,
-					resourceChanges: {
-						oil: RESOURCE_INCREMENT - occupationCost,
-						steel: RESOURCE_INCREMENT,
-						population: RESOURCE_INCREMENT,
-					},
-				}),
-			);
-
-			// Also send updated resources
-			this.app?.server?.publish(
-				`country:${countryName}`,
-				JSON.stringify({
-					type: "server.country.resources",
-					country: countryName,
-					resources: {
-						oil: finalOil,
-						steel: newSteel,
-						population: newPopulation,
-					},
-				}),
-			);
-		}
-
-		// Broadcast year change to global room (for mods and users not subscribed to specific countries)
+		// Broadcast year change to global room
 		this.app?.server?.publish(
 			"global",
 			JSON.stringify({
 				type: "server.year.changed",
 				year: newYear,
-				resourceChanges: {
-					oil: RESOURCE_INCREMENT,
-					steel: RESOURCE_INCREMENT,
-					population: RESOURCE_INCREMENT,
-				},
 			}),
 		);
 	}
