@@ -2644,6 +2644,76 @@ const app = new Elysia()
 			},
 		},
 	)
+	.post(
+		"/game/:gameId/mod-request",
+		async ({ params, query, set }) => {
+			const gameId = Number.parseInt(params.gameId, 10);
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+
+			if (!user || !user.country || user.country === "Mods") {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only players can call a moderator",
+				};
+			}
+
+			const [announcement] = await db
+				.insert(announcementsTable)
+				.values({
+					gameId,
+					content: `[MOD REQUEST] ${user.country}`,
+					targetCountries: [],
+					createdBy: user.id,
+					createdAt: new Date(),
+				})
+				.returning();
+
+			const announcementData = {
+				id: announcement.id,
+				gameId: announcement.gameId,
+				content: announcement.content,
+				targetCountries: announcement.targetCountries as
+					| PlayableCountry[]
+					| null,
+				createdBy: user.name,
+				createdAt: announcement.createdAt,
+			};
+
+			app.server?.publish(
+				"country:Mods",
+				JSON.stringify({
+					type: "server.announcement",
+					announcement: announcementData,
+				}),
+			);
+
+			return {
+				error: false as const,
+				announcement: announcementData,
+			};
+		},
+		{
+			params: t.Object({
+				gameId: t.String(),
+			}),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					announcement: AnnouncementSchema,
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Call Moderator",
+				description: "Creates a moderator request announcement (players only).",
+				tags: ["Announcements"],
+			},
+		},
+	)
 	.get(
 		"/game/:gameId/announcements",
 		async ({ params, query }) => {
@@ -2707,6 +2777,69 @@ const app = new Elysia()
 			detail: {
 				summary: "Get Announcements",
 				description: "Returns announcements visible to the user.",
+				tags: ["Announcements"],
+			},
+		},
+	)
+	.delete(
+		"/game/:gameId/announcements/:announcementId",
+		async ({ params, query, set }) => {
+			const gameId = Number.parseInt(params.gameId, 10);
+			const announcementId = Number.parseInt(params.announcementId, 10);
+
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+
+			if (!user || (user.role !== "admin" && user.country !== "Mods")) {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only admins and mods can delete announcements",
+				};
+			}
+
+			const [deleted] = await db
+				.delete(announcementsTable)
+				.where(
+					and(
+						eq(announcementsTable.id, announcementId),
+						eq(announcementsTable.gameId, gameId),
+					),
+				)
+				.returning({
+					id: announcementsTable.id,
+				});
+
+			if (!deleted) {
+				set.status = 404;
+				return {
+					error: true as const,
+					message: "Announcement not found",
+				};
+			}
+
+			return {
+				error: false as const,
+				message: "Announcement deleted successfully",
+			};
+		},
+		{
+			params: t.Object({
+				gameId: t.String(),
+				announcementId: t.String(),
+			}),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					message: t.String(),
+				}),
+				ErrorSchema,
+			]),
+			detail: {
+				summary: "Delete Announcement",
+				description: "Deletes an announcement (admin/mod only).",
 				tags: ["Announcements"],
 			},
 		},

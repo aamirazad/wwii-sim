@@ -3,14 +3,20 @@
 import type { Announcement, PlayableCountry } from "@api/schema";
 import { PLAYABLE_COUNTRIES } from "@api/schema";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Globe, Megaphone, Send, Users } from "lucide-react";
+import { Globe, Megaphone, Send, Trash2, Users } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import CountryDashboard from "@/components/country-dashboard";
 import LoadingSpinner from "@/components/loading-spinner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Card,
+	CardContent,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import {
 	Combobox,
 	ComboboxChip,
@@ -39,12 +45,26 @@ import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
 import { useGame } from "../../GameContext";
 
+const MOD_REQUEST_PREFIX = "[MOD REQUEST]";
+
+const getModRequestCountry = (content: string) => {
+	if (!content.startsWith(MOD_REQUEST_PREFIX)) return null;
+	const country = content.slice(MOD_REQUEST_PREFIX.length).trim();
+	return country || "Unknown";
+};
+
 function AnnouncementCard({
 	announcement,
 	index,
+	isMod,
+	onDelete,
+	isDeleting,
 }: {
 	announcement: Announcement;
 	index: number;
+	isMod: boolean;
+	onDelete: (announcementId: number) => Promise<void>;
+	isDeleting: boolean;
 }) {
 	const formattedDate = new Date(announcement.createdAt).toLocaleString(
 		undefined,
@@ -260,6 +280,18 @@ function AnnouncementCard({
 									<TooltipContent>Global announcement</TooltipContent>
 								</Tooltip>
 							)}
+							{isMod && (
+								<Button
+									size="icon"
+									variant="ghost"
+									className="ml-2 size-7"
+									disabled={isDeleting}
+									onClick={() => onDelete(announcement.id)}
+								>
+									<Trash2 className="h-4 w-4 text-destructive" />
+									<span className="sr-only">Delete announcement</span>
+								</Button>
+							)}
 						</div>
 					</div>
 				</CardHeader>
@@ -405,6 +437,10 @@ export default function AnnouncementsPage() {
 	const { gameState, userState, subscribeToMessage } = useGame();
 	const userId = getUserId();
 	const queryClient = useQueryClient();
+	const [isCallingMod, setIsCallingMod] = useState(false);
+	const [deletingAnnouncementId, setDeletingAnnouncementId] = useState<
+		number | null
+	>(null);
 
 	const userCountry =
 		userState.status === "authenticated" ? userState.user.country : null;
@@ -447,11 +483,118 @@ export default function AnnouncementsPage() {
 		announcementsData && !announcementsData.error
 			? announcementsData.announcements
 			: [];
+	const modRequests = announcements
+		.filter((announcement) =>
+			announcement.content.startsWith(MOD_REQUEST_PREFIX),
+		)
+		.sort(
+			(a, b) =>
+				new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+		);
+
+	const handleCallMod = async () => {
+		if (!userId || gameState.status !== "has-game" || isMod) return;
+
+		setIsCallingMod(true);
+		try {
+			const response = await api
+				.game({ gameId: String(gameState.game.id) })
+				["mod-request"].post(
+					{},
+					{
+						query: { authorization: userId },
+					},
+				);
+			if (!response.error) {
+				queryClient.invalidateQueries({ queryKey: ["announcements"] });
+			}
+		} finally {
+			setTimeout(() => {
+				setIsCallingMod(false);
+			}, 60000); // Prevent spamming
+		}
+	};
+
+	const handleDeleteAnnouncement = async (announcementId: number) => {
+		if (!userId || gameState.status !== "has-game") return;
+
+		setDeletingAnnouncementId(announcementId);
+		try {
+			const response = await api
+				.game({ gameId: String(gameState.game.id) })
+				.announcements({ announcementId: String(announcementId) })
+				.delete(undefined, {
+					query: { authorization: userId },
+				});
+			if (!response.error) {
+				queryClient.invalidateQueries({ queryKey: ["announcements"] });
+			}
+		} finally {
+			setDeletingAnnouncementId(null);
+		}
+	};
 
 	return (
 		<CountryDashboard tab="Message Board">
 			<div className="max-w-3xl mx-auto">
 				{isMod && <AnnouncementForm gameId={gameState.game.id} />}
+				{!isMod && (
+					<Card className="mb-6">
+						<CardHeader>
+							<CardTitle className="flex items-center gap-2">
+								<Megaphone className="h-5 w-5" />
+								Need Mod Help?
+							</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<Button onClick={handleCallMod} disabled={isCallingMod}>
+								Call a Mod
+							</Button>
+						</CardContent>
+						{isCallingMod && (
+							<CardFooter>
+								You have been added to the queue of countries and a mod will get
+								to you whenever it is your turn. Be patient!
+							</CardFooter>
+						)}
+					</Card>
+				)}
+				{isMod && (
+					<Card className="mb-6">
+						<CardHeader>
+							<CardTitle>Mod Request Queue</CardTitle>
+						</CardHeader>
+						<CardContent>
+							{modRequests.length === 0 ? (
+								<p className="text-sm text-muted-foreground">
+									No mod requests in queue.
+								</p>
+							) : (
+								<ol className="list-decimal pl-5 space-y-2">
+									{modRequests.map((announcement) => (
+										<li key={`mod-request-${announcement.id}`}>
+											<div className="flex items-center justify-between gap-3">
+												<span title={announcement.createdBy}>
+													{getModRequestCountry(announcement.content)}
+												</span>
+												<Button
+													size="sm"
+													variant="outline"
+													disabled={deletingAnnouncementId === announcement.id}
+													onClick={() =>
+														handleDeleteAnnouncement(announcement.id)
+													}
+												>
+													Check off
+												</Button>
+											</div>
+										</li>
+									))}
+								</ol>
+							)}
+						</CardContent>
+					</Card>
+				)}
 
 				<div className="space-y-4">
 					{isLoading ? (
@@ -471,13 +614,21 @@ export default function AnnouncementsPage() {
 							</CardContent>
 						</Card>
 					) : (
-						announcements.map((announcement, index) => (
-							<AnnouncementCard
-								key={announcement.id}
-								announcement={announcement}
-								index={index}
-							/>
-						))
+						announcements
+							.filter(
+								(announcement) =>
+									!announcement.content.startsWith(MOD_REQUEST_PREFIX),
+							)
+							.map((announcement, index) => (
+								<AnnouncementCard
+									key={announcement.id}
+									announcement={announcement}
+									index={index}
+									isMod={isMod}
+									onDelete={handleDeleteAnnouncement}
+									isDeleting={deletingAnnouncementId === announcement.id}
+								/>
+							))
 					)}
 				</div>
 			</div>
