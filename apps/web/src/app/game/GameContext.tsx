@@ -5,11 +5,12 @@ import type {
 	Country,
 	CountryResources,
 	ExtendedGame,
+	PlayableCountry,
 	ServerMessage,
 	User,
 } from "@api/schema";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
 	createContext,
 	type ReactNode,
@@ -21,7 +22,13 @@ import {
 } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import { api } from "@/lib/api";
-import { getUserId } from "@/lib/cookies";
+import {
+	DEFAULT_TUTORIAL_STATE,
+	getTutorialState,
+	getUserId,
+	type TutorialState,
+} from "@/lib/cookies";
+import { getTutorialDemoData } from "@/lib/tutorial-demo-data";
 
 export type GameState =
 	| { status: "loading" }
@@ -63,7 +70,29 @@ export function useGame() {
 
 export function GameProvider({ children }: { children: ReactNode }) {
 	const router = useRouter();
-	const userId = getUserId();
+	const searchParams = useSearchParams();
+	const [isHydrated, setIsHydrated] = useState(false);
+	const [userId, setUserId] = useState<string | null>(null);
+	const [tutorialState, setTutorialStateValue] = useState<TutorialState>(
+		DEFAULT_TUTORIAL_STATE,
+	);
+	const [demoCountry, setDemoCountry] = useState<PlayableCountry>(
+		DEFAULT_TUTORIAL_STATE.demoCountry,
+	);
+
+	useEffect(() => {
+		const nextUserId = getUserId();
+		const nextTutorialState = getTutorialState();
+		setUserId(nextUserId);
+		setTutorialStateValue(nextTutorialState);
+		setDemoCountry(nextTutorialState.demoCountry);
+		setIsHydrated(true);
+	}, []);
+
+	const isTutorialDemo =
+		searchParams.get("tutorial") === "1" ||
+		(isHydrated && tutorialState.demoMode);
+	const demoData = getTutorialDemoData(demoCountry);
 	const messageHandlers = useRef<Map<string, Set<MessageHandler>>>(new Map());
 	const [subscribedCountry, setSubscribedCountry] = useState<Country | null>(
 		null,
@@ -75,7 +104,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
 	const { sendJsonMessage, lastJsonMessage, readyState } =
 		useWebSocket<ServerMessage>(
-			userId ? `${wsUrl}?authorization=${userId}` : null,
+			userId && !isTutorialDemo ? `${wsUrl}?authorization=${userId}` : null,
 			{
 				shouldReconnect: () => true,
 				reconnectAttempts: 10,
@@ -86,8 +115,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
 		);
 
 	// Convert readyState to connection status
-	const connectionStatus: ConnectionStatus =
-		readyState === ReadyState.OPEN
+	const connectionStatus: ConnectionStatus = isTutorialDemo
+		? "connected"
+		: readyState === ReadyState.OPEN
 			? "connected"
 			: readyState === ReadyState.CONNECTING
 				? "connecting"
@@ -186,6 +216,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 			return response.data;
 		},
 		retry: 0,
+		enabled: isHydrated && !!userId && !isTutorialDemo,
 		refetchInterval: 30000, // 30s - handles waiting/lobby state and missed WS messages
 		refetchOnReconnect: true,
 		refetchOnWindowFocus: true,
@@ -204,7 +235,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 			if (response.error) throw new Error("Failed to fetch user");
 			return response.data;
 		},
-		enabled: !!userId,
+		enabled: isHydrated && !!userId && !isTutorialDemo,
 		refetchInterval: 60000, // 1min - catches country assignment changes
 		refetchOnReconnect: true,
 		refetchOnWindowFocus: true,
@@ -212,6 +243,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
 	});
 
 	const gameState: GameState = (() => {
+		if (!isHydrated) return { status: "loading" };
+		if (isTutorialDemo) {
+			return {
+				status: "has-game",
+				game: {
+					id: demoData.countryState.gameId,
+					status: "active",
+					startDate: new Date(Date.now() - 60 * 60 * 1000),
+					yearDurations: null,
+					currentYear: 1941,
+					createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+				},
+			};
+		}
 		if (gameLoading) return { status: "loading" };
 		if (gameError || !gameData)
 			return { status: "error", message: "Failed to connect to server" };
@@ -221,6 +266,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
 	})();
 
 	const userState: UserState = (() => {
+		if (!isHydrated) return { status: "loading" };
+		if (isTutorialDemo) {
+			return {
+				status: "authenticated",
+				user: {
+					id: "tutorial-demo-user",
+					username: "tutorial.demo",
+					name: "Demo Commander",
+					role: "player",
+					country: demoData.countryState.name,
+				},
+			};
+		}
 		if (!userId) return { status: "unauthenticated" };
 		if (userLoading) return { status: "loading" };
 		if (userError) return { status: "error", message: "Failed to fetch user" };
@@ -229,10 +287,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
 	})();
 
 	useEffect(() => {
+		if (!isHydrated) return;
+		if (isTutorialDemo) return;
 		if (userState.status === "unauthenticated") {
 			router.push("/");
 		}
-	}, [userState.status, router]);
+	}, [isHydrated, isTutorialDemo, userState.status, router]);
 
 	return (
 		<GameContext.Provider
@@ -240,8 +300,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
 				gameState,
 				userState,
 				connectionStatus,
-				subscribedCountry,
-				countryResources,
+				subscribedCountry: isTutorialDemo
+					? demoData.countryState.name
+					: subscribedCountry,
+				countryResources: isTutorialDemo
+					? demoData.resources
+					: countryResources,
 				subscribeToMessage,
 				sendMessage,
 				subscribeToCountry,

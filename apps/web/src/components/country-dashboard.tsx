@@ -22,6 +22,7 @@ import Dock from "@/components/dock";
 import ExternalLink from "@/components/external-link";
 import FullAlert from "@/components/full-alert";
 import ManageUsers from "@/components/manage-users";
+import { useTutorial } from "@/components/tutorial-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
@@ -75,6 +76,7 @@ export default function CountryDashboard({
 		gameState,
 		subscribeToMessage,
 	} = useGame();
+	const { isDemoMode } = useTutorial();
 	const commitHash = process.env.NEXT_PUBLIC_COMMIT_SHA?.substring(0, 7);
 	const [currentYear, setCurrentYear] = useState<number | null>(null);
 
@@ -259,21 +261,22 @@ export default function CountryDashboard({
 			["next-year"].post({}, { query: { authorization: userId } });
 	};
 
+	const tutorialQuery = isDemoMode ? "?tutorial=1" : "";
 	const dockItems = [
 		{
 			icon: <CircleGauge size={24} />,
 			label: "Assets",
-			href: "/game/assets",
+			href: `/game/assets${tutorialQuery}`,
 		},
 		{
 			icon: <Megaphone size={24} />,
 			label: "Message Board",
-			href: "/game/announcements",
+			href: `/game/announcements${tutorialQuery}`,
 		},
 		{
 			icon: <Dices size={24} />,
 			label: "Research",
-			href: "/game/research",
+			href: `/game/research${tutorialQuery}`,
 		},
 	];
 
@@ -492,7 +495,10 @@ export default function CountryDashboard({
 					</Tooltip>
 				</div>
 			</header>
-			<div className="mx-6 grow flex backdrop-brightness-50 backdrop-blur-3xl border border-white/10 rounded-xl shadow-2xl overflow-hidden relative">
+			<div
+				data-tutorial="game-shell-nav"
+				className="mx-6 grow flex backdrop-brightness-50 backdrop-blur-3xl border border-white/10 rounded-xl shadow-2xl overflow-hidden relative"
+			>
 				{/* Inner Content */}
 				<div className="p-8 h-full overflow-auto w-full">{children}</div>
 			</div>

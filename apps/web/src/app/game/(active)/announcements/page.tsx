@@ -8,6 +8,7 @@ import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import CountryDashboard from "@/components/country-dashboard";
 import LoadingSpinner from "@/components/loading-spinner";
+import { useTutorial } from "@/components/tutorial-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +44,7 @@ import {
 import { useGamePageGuard } from "@/hooks/useGamePageGuard";
 import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
+import { getTutorialDemoData } from "@/lib/tutorial-demo-data";
 import { useGame } from "../../GameContext";
 
 const MOD_REQUEST_PREFIX = "[MOD REQUEST]";
@@ -73,6 +75,7 @@ function AnnouncementCard({
 			day: "numeric",
 			hour: "numeric",
 			minute: "2-digit",
+			timeZone: "UTC",
 		},
 	);
 
@@ -433,7 +436,7 @@ function AnnouncementForm({ gameId }: { gameId: number }) {
 	);
 }
 
-export default function AnnouncementsPage() {
+function LiveAnnouncementsPage() {
 	const { gameState, userState, subscribeToMessage } = useGame();
 	const userId = getUserId();
 	const queryClient = useQueryClient();
@@ -539,7 +542,7 @@ export default function AnnouncementsPage() {
 			<div className="max-w-3xl mx-auto">
 				{isMod && <AnnouncementForm gameId={gameState.game.id} />}
 				{!isMod && (
-					<Card className="mb-6">
+					<Card className="mb-6" data-tutorial="announcements-mod-help">
 						<CardHeader>
 							<CardTitle className="flex items-center gap-2">
 								<Megaphone className="h-5 w-5" />
@@ -595,8 +598,7 @@ export default function AnnouncementsPage() {
 						</CardContent>
 					</Card>
 				)}
-
-				<div className="space-y-4">
+				<div className="space-y-4" data-tutorial="announcements-feed">
 					{isLoading ? (
 						<p className="text-muted-foreground text-center py-8">
 							Loading announcements...
@@ -634,4 +636,49 @@ export default function AnnouncementsPage() {
 			</div>
 		</CountryDashboard>
 	);
+}
+
+function DemoAnnouncementsPage() {
+	const { demoCountry } = useTutorial();
+	const demoData = getTutorialDemoData(demoCountry);
+
+	return (
+		<CountryDashboard tab="Message Board">
+			<div className="max-w-3xl mx-auto">
+				<Card className="mb-6" data-tutorial="announcements-mod-help">
+					<CardHeader>
+						<CardTitle className="flex items-center gap-2">
+							<Megaphone className="h-5 w-5" />
+							Need Mod Help?
+						</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-2">
+						<Button disabled>Call a Mod</Button>
+						<p className="text-sm text-muted-foreground">
+							In live games this queues your country for moderator support and
+							approval.
+						</p>
+					</CardContent>
+				</Card>
+
+				<div className="space-y-4" data-tutorial="announcements-feed">
+					{demoData.announcements.map((announcement, index) => (
+						<AnnouncementCard
+							key={announcement.id}
+							announcement={announcement}
+							index={index}
+							isMod={false}
+							onDelete={async () => {}}
+							isDeleting={false}
+						/>
+					))}
+				</div>
+			</div>
+		</CountryDashboard>
+	);
+}
+
+export default function AnnouncementsPage() {
+	const { isDemoMode } = useTutorial();
+	return isDemoMode ? <DemoAnnouncementsPage /> : <LiveAnnouncementsPage />;
 }

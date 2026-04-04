@@ -1,3 +1,5 @@
+"use client";
+
 import PixelBlast from "@/components/pixel-blast";
 
 export default function Background({

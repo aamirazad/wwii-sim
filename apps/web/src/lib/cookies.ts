@@ -1,3 +1,5 @@
+import type { PlayableCountry } from "@api/schema";
+
 /**
  * Cookie utilities for client-side cookie management
  *
@@ -6,6 +8,56 @@
  */
 
 const ONE_YEAR_IN_SECONDS = 31536000;
+const TUTORIAL_STATE_COOKIE = "tutorialState";
+
+export interface TutorialState {
+	hasSeenIntro: boolean;
+	dismissed: boolean;
+	completed: boolean;
+	demoMode: boolean;
+	demoCountry: PlayableCountry;
+}
+
+export const DEFAULT_TUTORIAL_STATE: TutorialState = {
+	hasSeenIntro: false,
+	dismissed: false,
+	completed: false,
+	demoMode: false,
+	demoCountry: "Germany",
+};
+
+function isPlayableCountry(value: unknown): value is PlayableCountry {
+	return (
+		value === "Commonwealth" ||
+		value === "France" ||
+		value === "Germany" ||
+		value === "Italy" ||
+		value === "Japan" ||
+		value === "Russia" ||
+		value === "United Kingdom" ||
+		value === "United States"
+	);
+}
+
+function parseTutorialState(rawValue: string | null): TutorialState {
+	if (!rawValue) return DEFAULT_TUTORIAL_STATE;
+	try {
+		const parsed = JSON.parse(rawValue);
+		if (!parsed || typeof parsed !== "object") return DEFAULT_TUTORIAL_STATE;
+		const safeDemoCountry = isPlayableCountry(parsed.demoCountry)
+			? parsed.demoCountry
+			: DEFAULT_TUTORIAL_STATE.demoCountry;
+		return {
+			hasSeenIntro: Boolean(parsed.hasSeenIntro),
+			dismissed: Boolean(parsed.dismissed),
+			completed: Boolean(parsed.completed),
+			demoMode: Boolean(parsed.demoMode),
+			demoCountry: safeDemoCountry,
+		};
+	} catch {
+		return DEFAULT_TUTORIAL_STATE;
+	}
+}
 
 /**
  * Get a cookie value by name
@@ -59,4 +111,29 @@ export function setUserId(userId: string): void {
  */
 export function clearUserId(): void {
 	deleteCookie("userId");
+}
+
+export function getTutorialState(): TutorialState {
+	return parseTutorialState(getCookie(TUTORIAL_STATE_COOKIE));
+}
+
+export function setTutorialState(
+	partial: Partial<TutorialState>,
+): TutorialState {
+	const nextState = {
+		...getTutorialState(),
+		...partial,
+	};
+	setCookie(TUTORIAL_STATE_COOKIE, JSON.stringify(nextState));
+	return nextState;
+}
+
+export function setTutorialDemoMode(
+	isEnabled: boolean,
+	demoCountry?: PlayableCountry,
+): TutorialState {
+	return setTutorialState({
+		demoMode: isEnabled,
+		demoCountry: demoCountry ?? getTutorialState().demoCountry,
+	});
 }

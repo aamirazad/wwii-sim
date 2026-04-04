@@ -5,6 +5,7 @@ import type {
 	CountryState,
 	ResourceChangeLog,
 	TradeRequest,
+	TroopChangeLog,
 	TroopCounts,
 	TroopLocation,
 	TroopType,
@@ -35,6 +36,7 @@ import { useGame } from "@/app/game/GameContext";
 import CountryDashboard from "@/components/country-dashboard";
 import GoBack from "@/components/go-back";
 import LoadingSpinner from "@/components/loading-spinner";
+import { useTutorial } from "@/components/tutorial-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -66,6 +68,10 @@ import {
 import { useGamePageGuard } from "@/hooks/useGamePageGuard";
 import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
+import {
+	loadTutorialDemoState,
+	saveTutorialDemoState,
+} from "@/lib/tutorial-demo-state";
 
 // Countries that mods can manage
 const PLAYABLE_COUNTRIES: Country[] = [
@@ -136,9 +142,18 @@ function MenuSelectionCard({
 function ResourceChangeForm({
 	countryState,
 	onSuccess,
+	onDemoSubmit,
+	showInfiniteUsOil = true,
 }: {
 	countryState: CountryState;
 	onSuccess: () => void;
+	onDemoSubmit?: (payload: {
+		oilDelta: number;
+		steelDelta: number;
+		populationDelta: number;
+		note: string;
+	}) => Promise<string | null | undefined> | string | null | undefined;
+	showInfiniteUsOil?: boolean;
 }) {
 	const userId = getUserId();
 	const [oilChange, setOilChange] = useState("");
@@ -152,13 +167,18 @@ function ResourceChangeForm({
 	const [note, setNote] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const usesInfiniteUsOil =
+		showInfiniteUsOil && countryState.name === "United States";
 
 	const anyNegative =
 		resultingOil < 0 || resultingSteel < 0 || resultingPopulation < 0;
 
 	const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
 		e.preventDefault();
-		if (!userId || !note.trim()) return;
+		if (!note.trim()) {
+			setError("Please enter a reason for the change");
+			return;
+		}
 
 		setIsSubmitting(true);
 		setError(null);
@@ -177,6 +197,33 @@ function ResourceChangeForm({
 
 		if (anyNegative) {
 			setError("Resulting resources cannot be negative");
+			setIsSubmitting(false);
+			return;
+		}
+
+		if (onDemoSubmit) {
+			const result = await onDemoSubmit({
+				oilDelta,
+				steelDelta,
+				populationDelta,
+				note: note.trim(),
+			});
+			if (typeof result === "string" && result.length > 0) {
+				setError(result);
+				setIsSubmitting(false);
+				return;
+			}
+			setOilChange("");
+			setSteelChange("");
+			setPopulationChange("");
+			setNote("");
+			onSuccess();
+			setIsSubmitting(false);
+			return;
+		}
+
+		if (!userId) {
+			setError("You must be logged in to submit resource changes");
 			setIsSubmitting(false);
 			return;
 		}
@@ -269,7 +316,7 @@ function ResourceChangeForm({
 								onChange={(e) => {
 									const v = e.target.value;
 									setValue(v);
-									if (countryState.name !== "United States" || id !== "oil") {
+									if (!(usesInfiniteUsOil && id === "oil")) {
 										setResulting(base + Number(v));
 									}
 								}}
@@ -279,7 +326,7 @@ function ResourceChangeForm({
 									className={`text-xs transition-all truncate ${resulting < 0 ? "text-destructive font-bold" : "text-muted-foreground font-normal"}`}
 								>
 									Result:{" "}
-									{countryState.name === "United States" && id === "oil"
+									{usesInfiniteUsOil && id === "oil"
 										? "∞"
 										: resulting.toLocaleString()}
 								</p>
@@ -323,9 +370,27 @@ function ResourceChangeForm({
 	);
 }
 
-function HistoryDialog({ countryState }: { countryState: CountryState }) {
+function HistoryDialog({
+	countryState,
+	demoLogs,
+	tutorialTargetId,
+	autoOpen,
+	showInfiniteUsOil = true,
+}: {
+	countryState: CountryState;
+	demoLogs?: ResourceChangeLog[];
+	tutorialTargetId?: string;
+	autoOpen?: boolean;
+	showInfiniteUsOil?: boolean;
+}) {
 	const userId = getUserId();
 	const [open, setOpen] = useState(false);
+	const usesInfiniteUsOil =
+		showInfiniteUsOil && countryState.name === "United States";
+
+	useEffect(() => {
+		if (autoOpen) setOpen(true);
+	}, [autoOpen]);
 
 	const { data: historyData } = useQuery({
 		queryKey: ["country-history", countryState.id],
@@ -340,14 +405,15 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 			if (response.error) throw new Error("Failed to fetch history");
 			return response.data;
 		},
-		enabled: open && !!userId,
+		enabled: open && !!userId && !demoLogs,
 	});
 
 	// Group logs by resource type and compute running totals
 	const processedHistory = (() => {
-		if (!historyData || historyData.error) return null;
-
-		const logs = historyData.logs;
+		const logs =
+			demoLogs ??
+			(historyData && !historyData.error ? historyData.logs : undefined);
+		if (!logs) return null;
 		if (logs.length === 0) return { oil: [], steel: [], population: [] };
 
 		// Group by resource type
@@ -381,7 +447,10 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 					</Button>
 				}
 			></DialogTrigger>
-			<DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+			<DialogContent
+				data-tutorial={tutorialTargetId}
+				className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
+			>
 				<DialogHeader>
 					<DialogTitle>Resource Change History</DialogTitle>
 					<DialogDescription>
@@ -421,8 +490,7 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 												<tr className="border-t bg-muted/20">
 													<td className="px-3 py-2 text-muted-foreground">—</td>
 													<td className="px-3 py-2 font-medium">
-														{countryState.name === "United States" &&
-														resourceType === "oil"
+														{usesInfiniteUsOil && resourceType === "oil"
 															? "∞"
 															: startingValue.toLocaleString()}
 													</td>
@@ -444,8 +512,7 @@ function HistoryDialog({ countryState }: { countryState: CountryState }) {
 																{change.toLocaleString()}
 															</td>
 															<td className="truncate min-w-24 max-w-24 px-3 py-2 font-medium">
-																{countryState.name === "United States" &&
-																log.resourceType === "oil"
+																{usesInfiniteUsOil && log.resourceType === "oil"
 																	? "∞"
 																	: log.newValue.toLocaleString()}
 															</td>
@@ -839,10 +906,15 @@ function TroopPurchaseForm({
 	countryState,
 	existingLocations,
 	onSuccess,
+	onDemoSubmit,
 }: {
 	countryState: CountryState;
 	existingLocations: TroopLocation[];
 	onSuccess: () => void;
+	onDemoSubmit?: (payload: {
+		quantities: TroopCounts;
+		allocations: PurchaseAllocation[];
+	}) => Promise<string | null | undefined> | string | null | undefined;
 }) {
 	const userId = getUserId();
 	const [quantities, setQuantities] = useState<TroopCounts>({ ...ZERO_TROOPS });
@@ -916,7 +988,6 @@ function TroopPurchaseForm({
 
 	const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
 		e.preventDefault();
-		if (!userId) return;
 		setIsSubmitting(true);
 		setError(null);
 
@@ -926,6 +997,31 @@ function TroopPurchaseForm({
 		);
 		if (validAllocations.length === 0) {
 			setError("Please allocate troops to at least one location");
+			setIsSubmitting(false);
+			return;
+		}
+
+		if (onDemoSubmit) {
+			const result = await onDemoSubmit({
+				quantities,
+				allocations: validAllocations,
+			});
+			if (typeof result === "string" && result.length > 0) {
+				setError(result);
+				setIsSubmitting(false);
+				return;
+			}
+			setQuantities({ ...ZERO_TROOPS });
+			setAllocations([
+				{ location: "", isHome: true, troops: { ...ZERO_TROOPS } },
+			]);
+			onSuccess();
+			setIsSubmitting(false);
+			return;
+		}
+
+		if (!userId) {
+			setError("You must be logged in to purchase troops");
 			setIsSubmitting(false);
 			return;
 		}
@@ -1136,10 +1232,19 @@ function TroopLocationEditor({
 	countryState,
 	locations,
 	onSuccess,
+	onDemoSubmit,
 }: {
 	countryState: CountryState;
 	locations: TroopLocation[];
 	onSuccess: () => void;
+	onDemoSubmit?: (payload: {
+		locations: {
+			name: string;
+			isHome: boolean;
+			troops: TroopCounts;
+		}[];
+		movementCost: number;
+	}) => Promise<string | null | undefined> | string | null | undefined;
 }) {
 	const userId = getUserId();
 
@@ -1257,9 +1362,37 @@ function TroopLocationEditor({
 	};
 
 	const handleSubmit = async () => {
-		if (!userId) return;
 		setIsSubmitting(true);
 		setError(null);
+
+		const nextLocations = editLocations
+			.filter((l) => l.name.trim() !== "")
+			.map((l) => ({
+				name: l.name.trim(),
+				isHome: l.isHome,
+				troops: l.troops,
+			}));
+
+		if (onDemoSubmit) {
+			const result = await onDemoSubmit({
+				locations: nextLocations,
+				movementCost,
+			});
+			if (typeof result === "string" && result.length > 0) {
+				setError(result);
+				setIsSubmitting(false);
+				return;
+			}
+			onSuccess();
+			setIsSubmitting(false);
+			return;
+		}
+
+		if (!userId) {
+			setError("You must be logged in to update troop locations");
+			setIsSubmitting(false);
+			return;
+		}
 
 		try {
 			const response = await api
@@ -1267,13 +1400,7 @@ function TroopLocationEditor({
 				.country({ countryId: String(countryState.id) })
 				.troops.locations.patch(
 					{
-						locations: editLocations
-							.filter((l) => l.name.trim() !== "")
-							.map((l) => ({
-								name: l.name.trim(),
-								isHome: l.isHome,
-								troops: l.troops,
-							})),
+						locations: nextLocations,
 					},
 					{ query: { authorization: userId } },
 				);
@@ -1426,7 +1553,15 @@ function TroopLocationEditor({
 	);
 }
 
-function TroopHistoryDialog({ countryState }: { countryState: CountryState }) {
+function TroopHistoryDialog({
+	countryState,
+	demoLogs,
+	tutorialTargetId,
+}: {
+	countryState: CountryState;
+	demoLogs?: TroopChangeLog[];
+	tutorialTargetId?: string;
+}) {
 	const userId = getUserId();
 	const [open, setOpen] = useState(false);
 
@@ -1441,11 +1576,15 @@ function TroopHistoryDialog({ countryState }: { countryState: CountryState }) {
 			if (response.error) throw new Error("Failed to fetch troop history");
 			return response.data;
 		},
-		enabled: open && !!userId,
+		enabled: open && !!userId && !demoLogs,
 	});
 
-	const logs =
-		troopData && !troopData.error
+	const logs = demoLogs
+		? [...demoLogs].sort(
+				(a, b) =>
+					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+			)
+		: troopData && !troopData.error
 			? [...troopData.logs].sort(
 					(a, b) =>
 						new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -1456,7 +1595,7 @@ function TroopHistoryDialog({ countryState }: { countryState: CountryState }) {
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger
 				render={
-					<Button variant="outline">
+					<Button variant="outline" data-tutorial={tutorialTargetId}>
 						<History className="mr-2 h-4 w-4" />
 						View Troop History
 					</Button>
@@ -1534,7 +1673,8 @@ function TroopHistoryDialog({ countryState }: { countryState: CountryState }) {
 	);
 }
 
-function Assets() {
+function LiveAssets() {
+	const { isActive, currentStepId } = useTutorial();
 	const { gameState, userState, countryResources, subscribeToMessage } =
 		useGame();
 	const userId = getUserId();
@@ -1705,7 +1845,7 @@ function Assets() {
 				{/* Resource Cards */}
 				{displayResources && countryState && (
 					<>
-						<div className="flex gap-4">
+						<div className="flex gap-4" data-tutorial="assets-overview">
 							<ResourceCard
 								name="Steel"
 								value={displayResources.steel.toLocaleString()}
@@ -1770,7 +1910,7 @@ function Assets() {
 
 						{tab === "troop-creation" && countryState && (
 							<div className="space-y-6">
-								<Card>
+								<Card data-tutorial="troop-purchase-card">
 									<CardHeader>
 										<CardTitle className="text-xl">
 											<GoBack onClick={() => setPageTab("home")} />
@@ -1787,7 +1927,7 @@ function Assets() {
 									</CardContent>
 								</Card>
 
-								<Card>
+								<Card data-tutorial="troop-location-card">
 									<CardHeader>
 										<CardTitle className="text-lg">
 											<MapPin className="mr-2 inline h-5 w-5" />
@@ -1826,10 +1966,17 @@ function Assets() {
 						{/* History Buttons */}
 						<div className="flex justify-end gap-2">
 							{tab === "troop-creation" && (
-								<TroopHistoryDialog countryState={countryState} />
+								<TroopHistoryDialog
+									countryState={countryState}
+									tutorialTargetId="troop-history-trigger"
+								/>
 							)}
 							{tab === "change-resources" && (
-								<HistoryDialog countryState={countryState} />
+								<HistoryDialog
+									countryState={countryState}
+									tutorialTargetId="resource-history-trigger"
+									autoOpen={isActive && currentStepId === "resource-logs"}
+								/>
 							)}
 						</div>
 					</>
@@ -1837,6 +1984,472 @@ function Assets() {
 			</div>
 		</CountryDashboard>
 	);
+}
+
+function DemoAssets() {
+	const router = useRouter();
+	const searchParams = useSearchParams();
+	const { currentStepId, demoCountry, isActive } = useTutorial();
+	const [demoState, setDemoState] = useState(() =>
+		loadTutorialDemoState(demoCountry),
+	);
+	const [tab, setTab] = useState<string>("home");
+
+	useEffect(() => {
+		setDemoState(loadTutorialDemoState(demoCountry));
+	}, [demoCountry]);
+
+	useEffect(() => {
+		saveTutorialDemoState(demoCountry, demoState);
+	}, [demoCountry, demoState]);
+
+	useEffect(() => {
+		const tabParam = searchParams.get("tab");
+		setTab(tabParam ?? "home");
+	}, [searchParams]);
+
+	const setPageTab = (newTab: string) => {
+		router.push(`/game/assets?tab=${newTab}&tutorial=1`);
+	};
+
+	const handleDemoResourceChange = ({
+		note,
+		oilDelta,
+		populationDelta,
+		steelDelta,
+	}: {
+		oilDelta: number;
+		steelDelta: number;
+		populationDelta: number;
+		note: string;
+	}) => {
+		let submissionError: string | null = null;
+		setDemoState((prev) => {
+			if (
+				prev.countryState.oil + oilDelta < 0 ||
+				prev.countryState.steel + steelDelta < 0 ||
+				prev.countryState.population + populationDelta < 0
+			) {
+				submissionError = "Resulting resources cannot be negative.";
+				return prev;
+			}
+			const nextCountryState = {
+				...prev.countryState,
+				oil: prev.countryState.oil + oilDelta,
+				steel: prev.countryState.steel + steelDelta,
+				population: prev.countryState.population + populationDelta,
+				updatedAt: new Date(),
+			};
+			const nextResourceLogs = [...prev.resourceLogs];
+			let nextLogId =
+				nextResourceLogs.length > 0
+					? Math.max(...nextResourceLogs.map((log) => log.id)) + 1
+					: 1;
+			const changes: Array<["oil" | "steel" | "population", number]> = [
+				["oil", oilDelta],
+				["steel", steelDelta],
+				["population", populationDelta],
+			];
+
+			for (const [resourceType, delta] of changes) {
+				if (delta === 0) continue;
+				const previousValue = prev.countryState[resourceType];
+				nextResourceLogs.push({
+					id: nextLogId++,
+					countryStateId: prev.countryState.id,
+					gameId: prev.countryState.gameId,
+					resourceType,
+					previousValue,
+					newValue: previousValue + delta,
+					note,
+					changedBy: "Demo Commander",
+					createdAt: new Date(),
+				});
+			}
+
+			return {
+				...prev,
+				resources: {
+					oil: nextCountryState.oil,
+					steel: nextCountryState.steel,
+					population: nextCountryState.population,
+				},
+				countryState: nextCountryState,
+				resourceLogs: nextResourceLogs,
+			};
+		});
+		return submissionError ?? undefined;
+	};
+
+	const handleDemoTroopPurchase = ({
+		allocations,
+		quantities,
+	}: {
+		quantities: TroopCounts;
+		allocations: PurchaseAllocation[];
+	}) => {
+		let submissionError: string | null = null;
+		setDemoState((prev) => {
+			let totalOilCost = 0;
+			let totalSteelCost = 0;
+			let totalPopulationCost = 0;
+			for (const troopType of TROOP_TYPES) {
+				const quantity = quantities[troopType];
+				totalOilCost += TROOP_COSTS[troopType].oil * quantity;
+				totalSteelCost += TROOP_COSTS[troopType].steel * quantity;
+				totalPopulationCost += TROOP_COSTS[troopType].population * quantity;
+			}
+
+			if (
+				prev.countryState.oil < totalOilCost ||
+				prev.countryState.steel < totalSteelCost ||
+				prev.countryState.population < totalPopulationCost
+			) {
+				submissionError =
+					"Not enough resources for this purchase in demo mode.";
+				return prev;
+			}
+
+			const locationByName = new Map(
+				prev.troopLocations.map((location) => [
+					location.name.toLowerCase(),
+					{ ...location },
+				]),
+			);
+			let nextLocationId =
+				prev.troopLocations.length > 0
+					? Math.max(...prev.troopLocations.map((location) => location.id)) + 1
+					: 1;
+			for (const allocation of allocations) {
+				const normalizedName = allocation.location.trim().toLowerCase();
+				if (!normalizedName) continue;
+				const existing = locationByName.get(normalizedName);
+				if (existing) {
+					existing.isHome = allocation.isHome;
+					for (const troopType of TROOP_TYPES) {
+						existing[troopType] += allocation.troops[troopType];
+					}
+					existing.updatedAt = new Date();
+					continue;
+				}
+
+				locationByName.set(normalizedName, {
+					id: nextLocationId++,
+					countryStateId: prev.countryState.id,
+					gameId: prev.countryState.gameId,
+					name: allocation.location.trim(),
+					isHome: allocation.isHome,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+					...allocation.troops,
+				});
+			}
+
+			const nextCountryState = {
+				...prev.countryState,
+				oil: prev.countryState.oil - totalOilCost,
+				steel: prev.countryState.steel - totalSteelCost,
+				population: prev.countryState.population - totalPopulationCost,
+				updatedAt: new Date(),
+			};
+
+			let nextResourceLogId =
+				prev.resourceLogs.length > 0
+					? Math.max(...prev.resourceLogs.map((log) => log.id)) + 1
+					: 1;
+			const nextResourceLogs = [...prev.resourceLogs];
+			const resourceCosts: Array<["oil" | "steel" | "population", number]> = [
+				["oil", totalOilCost],
+				["steel", totalSteelCost],
+				["population", totalPopulationCost],
+			];
+			for (const [resourceType, cost] of resourceCosts) {
+				if (cost <= 0) continue;
+				const previousValue = prev.countryState[resourceType];
+				nextResourceLogs.push({
+					id: nextResourceLogId++,
+					countryStateId: prev.countryState.id,
+					gameId: prev.countryState.gameId,
+					resourceType,
+					previousValue,
+					newValue: previousValue - cost,
+					note: "Troop purchase",
+					changedBy: "Demo Commander",
+					createdAt: new Date(),
+				});
+			}
+
+			const nextTroopLogId =
+				prev.troopLogs.length > 0
+					? Math.max(...prev.troopLogs.map((log) => log.id)) + 1
+					: 1;
+			return {
+				...prev,
+				resources: {
+					oil: nextCountryState.oil,
+					steel: nextCountryState.steel,
+					population: nextCountryState.population,
+				},
+				countryState: nextCountryState,
+				troopLocations: Array.from(locationByName.values()),
+				resourceLogs: nextResourceLogs,
+				troopLogs: [
+					...prev.troopLogs,
+					{
+						id: nextTroopLogId,
+						countryStateId: prev.countryState.id,
+						gameId: prev.countryState.gameId,
+						actionType: "purchase",
+						...quantities,
+						details: "Demo troop purchase",
+						oilCost: totalOilCost,
+						populationCost: totalPopulationCost,
+						steelCost: totalSteelCost,
+						changedBy: "Demo Commander",
+						createdAt: new Date(),
+					},
+				],
+			};
+		});
+		return submissionError;
+	};
+
+	const handleDemoLocationSave = ({
+		locations,
+		movementCost,
+	}: {
+		locations: {
+			name: string;
+			isHome: boolean;
+			troops: TroopCounts;
+		}[];
+		movementCost: number;
+	}) => {
+		let submissionError: string | null = null;
+		setDemoState((prev) => {
+			if (prev.countryState.oil < movementCost) {
+				submissionError = "Not enough oil for movement cost in demo mode.";
+				return prev;
+			}
+			const previousByName = new Map(
+				prev.troopLocations.map((location) => [
+					location.name.toLowerCase(),
+					location,
+				]),
+			);
+			let nextLocationId =
+				prev.troopLocations.length > 0
+					? Math.max(...prev.troopLocations.map((location) => location.id)) + 1
+					: 1;
+			const nextLocations = locations.map((location) => {
+				const existing = previousByName.get(location.name.toLowerCase());
+				return {
+					id: existing?.id ?? nextLocationId++,
+					countryStateId: prev.countryState.id,
+					gameId: prev.countryState.gameId,
+					name: location.name,
+					isHome: location.isHome,
+					...location.troops,
+					createdAt: existing?.createdAt ?? new Date(),
+					updatedAt: new Date(),
+				};
+			});
+
+			if (movementCost <= 0) {
+				return {
+					...prev,
+					troopLocations: nextLocations,
+				};
+			}
+
+			const nextCountryState = {
+				...prev.countryState,
+				oil: prev.countryState.oil - movementCost,
+				updatedAt: new Date(),
+			};
+			const nextResourceLogId =
+				prev.resourceLogs.length > 0
+					? Math.max(...prev.resourceLogs.map((log) => log.id)) + 1
+					: 1;
+			return {
+				...prev,
+				resources: {
+					...prev.resources,
+					oil: nextCountryState.oil,
+				},
+				countryState: nextCountryState,
+				troopLocations: nextLocations,
+				resourceLogs: [
+					...prev.resourceLogs,
+					{
+						id: nextResourceLogId,
+						countryStateId: prev.countryState.id,
+						gameId: prev.countryState.gameId,
+						resourceType: "oil",
+						previousValue: prev.countryState.oil,
+						newValue: nextCountryState.oil,
+						note: "Troop movement cost",
+						changedBy: "Demo Commander",
+						createdAt: new Date(),
+					},
+				],
+			};
+		});
+		return submissionError;
+	};
+
+	return (
+		<CountryDashboard tab="Assets">
+			<div className="space-y-8">
+				<Card className="border-primary/30 bg-primary/5">
+					<CardHeader>
+						<CardTitle>Tutorial Demo Mode</CardTitle>
+					</CardHeader>
+					<CardContent className="text-sm text-muted-foreground">
+						You are viewing local demo data for {demoCountry}. Resource and
+						troop changes are saved locally in your browser.
+					</CardContent>
+				</Card>
+
+				<div className="flex gap-4" data-tutorial="assets-overview">
+					<ResourceCard
+						name="Steel"
+						value={demoState.resources.steel.toLocaleString()}
+						icon={<Hammer className="h-5 w-5" />}
+					/>
+					<ResourceCard
+						name="Oil"
+						value={demoState.resources.oil.toLocaleString()}
+						icon={<Droplets className="h-5 w-5" />}
+					/>
+					<ResourceCard
+						name="Population"
+						value={demoState.resources.population.toLocaleString()}
+						icon={<Users className="h-5 w-5" />}
+					/>
+				</div>
+
+				{tab === "home" && (
+					<div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+						<MenuSelectionCard
+							title="Resources"
+							description="Review and simulate resource changes."
+							icon={<Pickaxe className="h-8 w-8" />}
+							onClick={() => setPageTab("change-resources")}
+						/>
+						<MenuSelectionCard
+							title="Troops"
+							description="Walk through troop purchase and location flow."
+							icon={<Factory className="h-8 w-8" />}
+							onClick={() => setPageTab("troop-creation")}
+						/>
+						<MenuSelectionCard
+							title="Trading"
+							description="Preview diplomacy tooling in safe mode."
+							icon={<Handshake className="h-8 w-8" />}
+							onClick={() => setPageTab("trading")}
+						/>
+					</div>
+				)}
+
+				{tab === "change-resources" && (
+					<Card>
+						<CardHeader>
+							<CardTitle className="text-xl">
+								<GoBack onClick={() => setPageTab("home")} />
+								Change Resources
+							</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<ResourceChangeForm
+								countryState={demoState.countryState}
+								onSuccess={() => {}}
+								onDemoSubmit={handleDemoResourceChange}
+								showInfiniteUsOil={false}
+							/>
+						</CardContent>
+					</Card>
+				)}
+
+				{tab === "troop-creation" && (
+					<div className="space-y-6">
+						<Card data-tutorial="troop-purchase-card">
+							<CardHeader>
+								<CardTitle className="text-xl">
+									<GoBack onClick={() => setPageTab("home")} />
+									Purchase Troops
+								</CardTitle>
+							</CardHeader>
+							<CardContent>
+								<TroopPurchaseForm
+									countryState={demoState.countryState}
+									existingLocations={demoState.troopLocations}
+									onSuccess={() => {}}
+									onDemoSubmit={handleDemoTroopPurchase}
+								/>
+							</CardContent>
+						</Card>
+
+						<Card data-tutorial="troop-location-card">
+							<CardHeader>
+								<CardTitle className="text-lg">
+									<MapPin className="mr-2 inline h-5 w-5" />
+									Troop Locations
+								</CardTitle>
+							</CardHeader>
+							<CardContent>
+								<TroopLocationEditor
+									countryState={demoState.countryState}
+									locations={demoState.troopLocations}
+									onSuccess={() => {}}
+									onDemoSubmit={handleDemoLocationSave}
+								/>
+							</CardContent>
+						</Card>
+					</div>
+				)}
+
+				{tab === "trading" && (
+					<Card>
+						<CardHeader>
+							<CardTitle className="text-xl">
+								<GoBack onClick={() => setPageTab("home")} />
+								Trading
+							</CardTitle>
+						</CardHeader>
+						<CardContent className="text-sm text-muted-foreground">
+							Trading requests are disabled in tutorial mode, but this is where
+							countries create and respond to trade offers in live sessions.
+						</CardContent>
+					</Card>
+				)}
+
+				<div className="flex justify-end gap-2">
+					{tab === "troop-creation" && (
+						<TroopHistoryDialog
+							countryState={demoState.countryState}
+							demoLogs={demoState.troopLogs}
+							tutorialTargetId="troop-history-trigger"
+						/>
+					)}
+					{tab === "change-resources" && (
+						<HistoryDialog
+							countryState={demoState.countryState}
+							demoLogs={demoState.resourceLogs}
+							tutorialTargetId="resource-history-trigger"
+							autoOpen={isActive && currentStepId === "resource-logs"}
+							showInfiniteUsOil={false}
+						/>
+					)}
+				</div>
+			</div>
+		</CountryDashboard>
+	);
+}
+
+function Assets() {
+	const { isDemoMode } = useTutorial();
+	return isDemoMode ? <DemoAssets /> : <LiveAssets />;
 }
 
 export default function App() {
