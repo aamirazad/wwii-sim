@@ -1,5 +1,7 @@
 # WWII Sim
 
+<img width="1500" height="500" alt="593_1x_shots_so" src="https://github.com/user-attachments/assets/16353fef-1cc8-48df-8b1c-7468204120f0" />
+
 *Learn history by playing it. Coordinate and strategize as nations in the Second World War. Wage war, forge alliances, and have fun.*
 
 The HASD History Club WWII Simulation is a game for students playing a country in WWII to compete against other students. With research and historical accuracy at the heart, the game teaches students about complex historical decisions and their resulting effects.
