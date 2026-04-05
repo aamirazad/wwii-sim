@@ -40,44 +40,52 @@ type TutorialStep = {
 
 const TUTORIAL_STEPS: TutorialStep[] = [
 	{
+		id: "home-tutorial",
+		route: "/",
+		title: "Welcome to WWII Sim Tutorial",
+		description:
+			"This website is quite complex, so this tutorial will walk you through all the features and give you all the tools you need to host your own simulations of your very own!",
+		selector: '[data-tutorial="home-title"]',
+	},
+	{
 		id: "home-premise",
 		route: "/",
-		title: "Welcome to WWII Sim",
+		title: "Here's how it works",
 		description:
-			"WWII Sim is a moderated strategy game where each country manages resources, builds troops, and responds to announcements in real time.",
-		selector: '[data-tutorial="home-intro"]',
+			"The WWII Sim is a moderated strategy game where groups of people act as a country during the Second World War. As the game progresses, each team will strategize, manage resources, build troops, and respond to other countries' actions.",
+		selector: '[data-tutorial="home-tutorial"]',
 	},
 	{
 		id: "home-countries",
 		route: "/",
 		title: "Playable countries",
 		description:
-			"Choose from Commonwealth, France, Germany, Italy, Japan, Russia, United Kingdom, and United States.",
+			"Before the game starts, each player joins a country. A country can be played solo, or with other people. More important countries such as Germany and U.S. tend to have 3-4 players playing the country at once! These are the options.",
 		selector: '[data-tutorial="home-countries"]',
 	},
 	{
 		id: "home-demo",
 		route: "/",
-		title: "Start a safe demo",
+		title: "Start the demo",
 		description:
-			"Pick a country and launch a local demo session with seeded resources, troop logs, and announcements.",
+			"Pick a country, we will create a fake game for you to try things out safely. In a real game, you would join your country by clicking the link sent to your email.",
 		selector: '[data-tutorial="home-demo-launch"]',
 		variant: "demo-launch",
 	},
 	{
 		id: "shell-nav",
 		route: "/game/assets?tutorial=1&tab=home",
-		title: "Active game shell",
+		title: "Country Dashboard",
 		description:
-			"This is the main gameplay shell. Use the country header and dock to navigate between Assets, Message Board, and Research.",
+			"This is the main country dashboard. The first page the player sees is the Assets page, where they can manage all the resources the country has and use such resources. The dock in the bottom allows them to switch between pages.",
 		selector: '[data-tutorial="game-shell-nav"]',
 	},
 	{
 		id: "assets-overview",
 		route: "/game/assets?tutorial=1&tab=home",
-		title: "Country resource overview",
+		title: "Resources",
 		description:
-			"Track steel, oil, and population here. Most gameplay actions consume these values, so this panel drives every strategic decision.",
+			"There are three resources a country has to manage: steel, oil, and population. Most gameplay actions consume these values, so having easy access to these numbers are essential. Countries get resources for successfully capturing territory, and every year they get a certain number of resources depending on their level.",
 		selector: '[data-tutorial="assets-overview"]',
 	},
 	{
@@ -85,23 +93,15 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 		route: "/game/assets?tutorial=1&tab=troop-creation",
 		title: "Build troops",
 		description:
-			"Use the troop purchase form to choose unit quantities. The total cost summary shows steel, oil, and population impact before purchase.",
+			"Countries can and should use the resources they collect to build their troops. This form allows the country to select what type of troops they would like to build, as well as requiring them to place the troops in a certain location on creation. After purchase, resources are automatically deducted.",
 		selector: '[data-tutorial="troop-purchase-card"]',
-	},
-	{
-		id: "troop-allocation",
-		route: "/game/assets?tutorial=1&tab=troop-creation",
-		title: "Allocate troop locations",
-		description:
-			"After purchase, allocate troops to specific locations and mark home territory. This mirrors the real location allocation workflow.",
-		selector: '[data-tutorial="troop-location-card"]',
 	},
 	{
 		id: "resource-logs",
 		route: "/game/assets?tutorial=1&tab=change-resources",
-		title: "Resource loss and change logs",
+		title: "Resource change logs",
 		description:
-			"Open resource history to review gains/losses, notes, and timestamps. This is where you audit moderator and combat-driven resource changes.",
+			"All actions are logged. Every change requires a note, which is the reason for such change. During the game, moderators have access to a special Mod Dashboard where they can view every countries resources as well as their change log. It is their job to make sure countries are playing fairly and not playing in a historically accurate way.",
 		selector: '[data-tutorial="resource-history-trigger"]',
 	},
 	{
@@ -109,15 +109,15 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 		route: "/game/announcements?tutorial=1",
 		title: "Announcement feed",
 		description:
-			"Major updates, battle outcomes, and moderator instructions are posted here for countries to react to quickly.",
+			"As the game progresses, moderators declare major updates and battle outcomes here. Announcements can be sent to certain countries if they should not be revealed publicly.",
 		selector: '[data-tutorial="announcements-feed"]',
 	},
 	{
 		id: "free-play",
 		route: "/game/assets?tutorial=1&tab=home",
-		title: "You are ready",
+		title: "You are now ready",
 		description:
-			"You are now free to explore the dashboard on your own. Try changing resources, buying troops, and moving units in demo mode.",
+			"You are now free to explore the dashboard on your own. In demo mode, you cannot play with other people. If you would like to host a game of your own with other people, please click the button below.",
 		selector: '[data-tutorial="game-shell-nav"]',
 	},
 ];
@@ -253,8 +253,24 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 			return;
 		}
 
+		let frameId: number | null = null;
+		let observedElement: Element | null = null;
+		let resizeObserver: ResizeObserver | null = null;
 		const updateSpotlight = () => {
+			frameId = null;
 			const element = document.querySelector(currentStep.selector ?? "");
+			if (observedElement !== element) {
+				resizeObserver?.disconnect();
+				observedElement = element;
+				if (observedElement) {
+					resizeObserver = new ResizeObserver(() => {
+						scheduleSpotlightUpdate();
+					});
+					resizeObserver.observe(observedElement);
+				} else {
+					resizeObserver = null;
+				}
+			}
 			if (!element) {
 				setSpotlightRect(null);
 				return;
@@ -266,16 +282,29 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 			}
 			setSpotlightRect(rect);
 		};
-
+		const scheduleSpotlightUpdate = () => {
+			if (frameId !== null) return;
+			frameId = window.requestAnimationFrame(updateSpotlight);
+		};
+		const mutationObserver = new MutationObserver(() => {
+			scheduleSpotlightUpdate();
+		});
 		updateSpotlight();
-		window.addEventListener("resize", updateSpotlight);
-		window.addEventListener("scroll", updateSpotlight, true);
-		const interval = window.setInterval(updateSpotlight, 200);
-
+		window.addEventListener("resize", scheduleSpotlightUpdate);
+		window.addEventListener("scroll", scheduleSpotlightUpdate, true);
+		mutationObserver.observe(document.body, {
+			childList: true,
+			subtree: true,
+			attributes: true,
+		});
 		return () => {
-			window.removeEventListener("resize", updateSpotlight);
-			window.removeEventListener("scroll", updateSpotlight, true);
-			window.clearInterval(interval);
+			window.removeEventListener("resize", scheduleSpotlightUpdate);
+			window.removeEventListener("scroll", scheduleSpotlightUpdate, true);
+			mutationObserver.disconnect();
+			resizeObserver?.disconnect();
+			if (frameId !== null) {
+				window.cancelAnimationFrame(frameId);
+			}
 		};
 	}, [currentStep, isActive]);
 
@@ -314,7 +343,7 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 			{isHydrated && !isActive && persistedState.hasSeenIntro && (
 				<Button
 					onClick={startTutorial}
-					className="fixed bottom-4 right-4 z-[60] shadow-xl"
+					className="fixed bottom-4 right-4 z-60 shadow-xl"
 					variant="secondary"
 				>
 					<Compass className="mr-2 h-4 w-4" />
@@ -325,13 +354,13 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 				<>
 					{spotlightStyle ? (
 						<div
-							className="fixed z-[70] pointer-events-none rounded-xl border-2 border-primary/80 transition-all duration-200"
+							className="fixed z-70 pointer-events-none rounded-xl border-2 border-primary/80 transition-all duration-200"
 							style={spotlightStyle}
 						/>
 					) : (
-						<div className="fixed inset-0 z-[70] bg-slate-950/75" />
+						<div className="fixed inset-0 z-70 bg-slate-950/75" />
 					)}
-					<Card className="fixed bottom-4 right-4 z-[80] w-[min(27rem,calc(100vw-1rem))] border-primary/40 bg-background/95 shadow-2xl backdrop-blur">
+					<Card className="fixed bottom-4 right-4 z-80 w-[min(30rem,calc(100vw-1rem))] border-primary/40 bg-background/95 shadow-2xl backdrop-blur">
 						<CardHeader className="pb-2">
 							<CardTitle className="text-lg">{currentStep.title}</CardTitle>
 							<CardDescription>{currentStep.description}</CardDescription>
@@ -367,6 +396,16 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 										Launch demo session
 									</Button>
 								</div>
+							)}
+							{currentStep.id === "free-play" && (
+								<Button
+									onClick={() => {
+										dismissTutorial();
+										router.push("/login?id=ufp3zhfaqd1c1b6f5jv2jduh");
+									}}
+								>
+									Login as Admin
+								</Button>
 							)}
 						</CardContent>
 						<CardFooter className="justify-between gap-2">

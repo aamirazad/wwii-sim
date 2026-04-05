@@ -26,7 +26,9 @@ export default function Homepage() {
 			<div className="relative pointer-events-none flex flex-col items-center justify-center flex-1">
 				<div className="pointer-events-auto max-w-2/5 text-center">
 					<p className="pb-2">HASD History Club & Aamir Azad present</p>
-					<h1 className="text-5xl font-bold">The WWII Sim</h1>
+					<h1 className="text-5xl font-bold" data-tutorial="home-title">
+						The WWII Sim
+					</h1>
 					<p className="italic">In Beta!</p>
 					<div className="flex flex-col justify-center">
 						<p className="mt-5 text-justify">
@@ -41,8 +43,8 @@ export default function Homepage() {
 							</p>
 						) : !userId ? (
 							<div className="mt-5 rounded-lg bg-primary-foreground p-4 text-left space-y-3">
-								<div data-tutorial="home-intro" className="space-y-1">
-									<p className="font-semibold">First-run guided briefing</p>
+								<div data-tutorial="home-tutorial" className="space-y-1">
+									<p className="font-semibold">Do the tutorial</p>
 									<p className="text-sm text-muted-foreground">
 										The game is meant to be played in person, with a group of
 										people all connected to the website. I have hosted this game

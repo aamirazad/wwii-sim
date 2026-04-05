@@ -2000,6 +2000,9 @@ function DemoAssets() {
 	}, [demoCountry]);
 
 	useEffect(() => {
+		if (demoState.country !== demoCountry) {
+			return;
+		}
 		saveTutorialDemoState(demoCountry, demoState);
 	}, [demoCountry, demoState]);
 

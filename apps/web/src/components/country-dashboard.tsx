@@ -7,7 +7,6 @@ import {
 	CirclePlay,
 	CircleX,
 	ClockArrowUp,
-	Dices,
 	ExternalLinkIcon,
 	Grip,
 	Megaphone,
@@ -273,11 +272,6 @@ export default function CountryDashboard({
 			label: "Message Board",
 			href: `/game/announcements${tutorialQuery}`,
 		},
-		{
-			icon: <Dices size={24} />,
-			label: "Research",
-			href: `/game/research${tutorialQuery}`,
-		},
 	];
 
 	const paused =
@@ -323,7 +317,7 @@ export default function CountryDashboard({
 	];
 
 	return (
-		<div className="flex flex-col grow relative">
+		<div data-tutorial="game-shell-nav" className="flex flex-col grow relative">
 			{/* Top Bar */}
 			<header className="w-full pt-4 px-8 pb-3 flex justify-between items-center">
 				<div className="flex items-baseline gap-4">
@@ -495,10 +489,7 @@ export default function CountryDashboard({
 					</Tooltip>
 				</div>
 			</header>
-			<div
-				data-tutorial="game-shell-nav"
-				className="mx-6 grow flex backdrop-brightness-50 backdrop-blur-3xl border border-white/10 rounded-xl shadow-2xl overflow-hidden relative"
-			>
+			<div className="mx-6 grow flex backdrop-brightness-50 backdrop-blur-3xl border border-white/10 rounded-xl shadow-2xl overflow-hidden relative">
 				{/* Inner Content */}
 				<div className="p-8 h-full overflow-auto w-full">{children}</div>
 			</div>
