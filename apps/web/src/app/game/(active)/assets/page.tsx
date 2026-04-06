@@ -9,6 +9,7 @@ import type {
 	TroopCounts,
 	TroopLocation,
 	TroopType,
+	User,
 } from "@api/schema";
 import {
 	TROOP_COSTS,
@@ -36,6 +37,7 @@ import { useGame } from "@/app/game/GameContext";
 import CountryDashboard from "@/components/country-dashboard";
 import GoBack from "@/components/go-back";
 import LoadingSpinner from "@/components/loading-spinner";
+import ManageUsers from "@/components/manage-users";
 import { useTutorial } from "@/components/tutorial-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -2014,6 +2016,43 @@ function DemoAssets() {
 	const setPageTab = (newTab: string) => {
 		router.push(`/game/assets?tab=${newTab}&tutorial=1`);
 	};
+	const demoUsers: User[] = [
+		{
+			id: "demo-user-1",
+			name: "Ava Thompson",
+			username: "ava.t",
+			role: "player",
+			country: "Germany",
+		},
+		{
+			id: "demo-user-2",
+			name: "Liam Carter",
+			username: "liam.c",
+			role: "player",
+			country: "United Kingdom",
+		},
+		{
+			id: "demo-user-3",
+			name: "Maya Patel",
+			username: "maya.p",
+			role: "player",
+			country: "Russia",
+		},
+		{
+			id: "demo-user-4",
+			name: "Noah Rivera",
+			username: "noah.r",
+			role: "spectator",
+			country: undefined,
+		},
+		{
+			id: "demo-user-5",
+			name: "Sophia Kim",
+			username: "sophia.k",
+			role: "admin",
+			country: "Mods",
+		},
+	];
 
 	const handleDemoResourceChange = ({
 		note,
@@ -2425,6 +2464,12 @@ function DemoAssets() {
 							countries create and respond to trade offers in live sessions.
 						</CardContent>
 					</Card>
+				)}
+
+				{tab === "user-management" && (
+					<div data-tutorial="user-management-screen">
+						<ManageUsers demoUsers={demoUsers} />
+					</div>
 				)}
 
 				<div className="flex justify-end gap-2">

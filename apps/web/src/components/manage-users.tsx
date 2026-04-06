@@ -52,10 +52,17 @@ import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
 import { cn } from "@/lib/utils";
 
-export default function ManageUsers({ fullPage }: { fullPage?: boolean }) {
+export default function ManageUsers({
+	fullPage,
+	demoUsers,
+}: {
+	fullPage?: boolean;
+	demoUsers?: User[];
+}) {
 	const router = useRouter();
 	const queryClient = useQueryClient();
 	const userId = getUserId();
+	const isDemoMode = !!demoUsers;
 	const [mounted, setMounted] = useState(false);
 	const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 	const [createFormData, setCreateFormData] = useState({
@@ -65,6 +72,7 @@ export default function ManageUsers({ fullPage }: { fullPage?: boolean }) {
 		role: "player" as "admin" | "player" | "spectator",
 	});
 	const [error, setError] = useState<string | null>(null);
+	const [demoUsersState, setDemoUsersState] = useState<User[]>(demoUsers ?? []);
 
 	// Check if user is authenticated and is admin
 	const { data: userData, isLoading: userLoading } = useQuery({
@@ -75,7 +83,7 @@ export default function ManageUsers({ fullPage }: { fullPage?: boolean }) {
 			if (response.error) throw new Error("Failed to fetch user");
 			return response.data;
 		},
-		enabled: !!userId,
+		enabled: !!userId && !isDemoMode,
 	});
 
 	// Fetch all users
@@ -89,7 +97,7 @@ export default function ManageUsers({ fullPage }: { fullPage?: boolean }) {
 			if (response.error) throw new Error("Failed to fetch users");
 			return response.data;
 		},
-		enabled: !!userId,
+		enabled: !!userId && !isDemoMode,
 	});
 
 	// Create user mutation
@@ -147,18 +155,27 @@ export default function ManageUsers({ fullPage }: { fullPage?: boolean }) {
 		setMounted(true);
 	}, []);
 
+	useEffect(() => {
+		if (demoUsers) {
+			setDemoUsersState(demoUsers);
+		}
+	}, [demoUsers]);
+
 	if (!mounted) return null;
 
-	if (!userId) {
+	if (!isDemoMode && !userId) {
 		router.push("/login");
 		return null;
 	}
 
-	if (userLoading) {
+	if (!isDemoMode && userLoading) {
 		return <LoadingSpinner />;
 	}
 
-	if (userData?.error || !userData?.user || userData.user.role !== "admin") {
+	if (
+		!isDemoMode &&
+		(userData?.error || !userData?.user || userData.user.role !== "admin")
+	) {
 		return (
 			<div className="flex items-center justify-center h-screen">
 				<Alert variant="destructive" className="max-w-md">
@@ -184,28 +201,36 @@ export default function ManageUsers({ fullPage }: { fullPage?: boolean }) {
 						{fullPage && <GoBack />}
 						User Management
 					</h1>
-					<p className="text-muted-foreground">
-						Create users and assign them to countries
-					</p>
 				</div>
-				<Button onClick={() => setIsCreateDialogOpen(true)}>
+				<Button
+					onClick={() => setIsCreateDialogOpen(true)}
+					disabled={isDemoMode}
+				>
 					<UserPlus className="mr-2 h-4 w-4" />
 					Create User
 				</Button>
 			</div>
 
-			{usersLoading ? (
+			{!isDemoMode && usersLoading ? (
 				<div className="flex items-center justify-center h-64">
 					<p>Loading users...</p>
 				</div>
 			) : (
 				<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-					{users?.map((user) => (
+					{(isDemoMode ? demoUsersState : users)?.map((user) => (
 						<UserCard
 							key={user.id}
 							user={user}
 							onAssignCountry={(country) =>
-								assignCountryMutation.mutate({ userId: user.id, country })
+								isDemoMode
+									? setDemoUsersState((prev) =>
+											prev.map((existing) =>
+												existing.id === user.id
+													? { ...existing, country: country ?? undefined }
+													: existing,
+											),
+										)
+									: assignCountryMutation.mutate({ userId: user.id, country })
 							}
 						/>
 					))}

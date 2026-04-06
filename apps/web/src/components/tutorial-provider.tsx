@@ -101,8 +101,16 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 		route: "/game/assets?tutorial=1&tab=change-resources",
 		title: "Resource change logs",
 		description:
-			"All actions are logged. Every change requires a note, which is the reason for such change. During the game, moderators have access to a special Mod Dashboard where they can view every countries resources as well as their change log. It is their job to make sure countries are playing fairly and not playing in a historically accurate way.",
+			"All actions are logged. Every change requires a note, which is the reason for such change.",
 		selector: '[data-tutorial="resource-history-trigger"]',
+	},
+	{
+		id: "user-management",
+		route: "/game/assets?tutorial=1&tab=user-management",
+		title: "Mod Dashboard",
+		description:
+			"During the game, moderators have access to a special Mod Dashboard where they can view every countries resources as well as their change log. It is their job to make sure countries are playing fairly and in a historically accurate way. One of the feature's shown here is the user management screen, where moderators can create users and assign them to countries.",
+		selector: '[data-tutorial="user-management-screen"]',
 	},
 	{
 		id: "announcements-feed",
@@ -112,7 +120,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 			"As the game progresses, moderators declare major updates and battle outcomes here. Announcements can be sent to certain countries if they should not be revealed publicly.",
 		selector: '[data-tutorial="announcements-feed"]',
 	},
-		{
+	{
 		id: "auto-update",
 		route: "/game/assets?tutorial=1&tab=home",
 		title: "Data Syncs in Real-Time",
