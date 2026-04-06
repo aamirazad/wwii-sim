@@ -112,6 +112,14 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 			"As the game progresses, moderators declare major updates and battle outcomes here. Announcements can be sent to certain countries if they should not be revealed publicly.",
 		selector: '[data-tutorial="announcements-feed"]',
 	},
+		{
+		id: "auto-update",
+		route: "/game/assets?tutorial=1&tab=home",
+		title: "Data Syncs in Real-Time",
+		description:
+			"Since multiple players can be working together to manage a country, dashboard uses websockets to deliver updates in real time. Every change automatically syncs across all players in the country, as well as the moderators.",
+		selector: '[data-tutorial="assets-overview"]',
+	},
 	{
 		id: "free-play",
 		route: "/game/assets?tutorial=1&tab=home",
@@ -404,7 +412,7 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 										router.push("/login?id=ufp3zhfaqd1c1b6f5jv2jduh");
 									}}
 								>
-									Login as Admin
+									Host a Game
 								</Button>
 							)}
 						</CardContent>
