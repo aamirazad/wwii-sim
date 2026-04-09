@@ -65,7 +65,12 @@ function NoGameInProgress({
 				</AlertDescription>
 			</Alert>
 			{isAdmin ? (
-				<Button onClick={() => router.push("/create")}>Create New Game</Button>
+				<Button
+					data-tutorial="create-new-game"
+					onClick={() => router.push("/create")}
+				>
+					Create New Game
+				</Button>
 			) : null}
 		</FullAlert>
 	);
@@ -255,6 +260,7 @@ function GameWaiting({
 								<p>As an admin, you can start the game at any time.</p>
 								<div className="flex gap-2 justify-center ">
 									<Button
+										data-tutorial="start-game-button"
 										onClick={() =>
 											sendMessage({
 												type: "client.game.start",
@@ -266,7 +272,10 @@ function GameWaiting({
 										Start Game
 									</Button>
 									<Link href="/admin/users">
-										<Button variant="outline">
+										<Button
+											variant="outline"
+											data-tutorial="manage-users-button"
+										>
 											<Users className="mr-2 h-4 w-4" />
 											Manage Users
 										</Button>

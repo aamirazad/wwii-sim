@@ -126,7 +126,10 @@ export default function CreateGamePage() {
 	return (
 		<Background static={true}>
 			<Center>
-				<div className="w-full max-w-4xl p-4">
+				<div
+					data-tutorial="create-game-scheduling"
+					className="w-full max-w-4xl p-4"
+				>
 					<form onSubmit={handleSubmit} className="space-y-8">
 						{error && (
 							<Alert variant="destructive">
@@ -218,7 +221,11 @@ export default function CreateGamePage() {
 
 						{/* Submit Button */}
 						<div className="flex justify-end">
-							<Button type="submit" disabled={isSubmitting}>
+							<Button
+								type="submit"
+								disabled={isSubmitting}
+								data-tutorial="create-game-submit"
+							>
 								{isSubmitting ? "Creating..." : "Create Game"}
 							</Button>
 						</div>

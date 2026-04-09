@@ -205,6 +205,7 @@ export default function ManageUsers({
 				<Button
 					onClick={() => setIsCreateDialogOpen(true)}
 					disabled={isDemoMode}
+					data-tutorial="manage-users-create-user"
 				>
 					<UserPlus className="mr-2 h-4 w-4" />
 					Create User
@@ -373,7 +374,16 @@ function UserCard({
 				<CardDescription>@{user.username}</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
-				<Button variant="outline" size="sm" onClick={copyLoginLink}>
+				<Button
+					variant="outline"
+					size="sm"
+					onClick={copyLoginLink}
+					data-tutorial={
+						user.username === "flavortowntest"
+							? "manage-users-copy-login"
+							: undefined
+					}
+				>
 					{copy ? <Check /> : <Copy className="mr-2 h-4 w-4" />}
 					Copy login link
 				</Button>
@@ -388,6 +398,7 @@ function UserCard({
 									role="combobox"
 									aria-expanded={open}
 									className="w-full justify-between"
+									data-tutorial="manage-users-country-assignment"
 								>
 									{user.country || "Not assigned"}
 									<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

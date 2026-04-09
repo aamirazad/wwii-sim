@@ -1822,7 +1822,10 @@ function LiveAssets() {
 			<div className="space-y-8">
 				{/* Country Selector for Mods */}
 				{isMod && (
-					<div className="flex items-center gap-4">
+					<div
+						className="flex items-center gap-4"
+						data-tutorial="mod-country-selector"
+					>
 						<Label htmlFor="country-select" className="text-lg font-semibold">
 							Select Country:
 						</Label>

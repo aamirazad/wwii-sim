@@ -10,6 +10,7 @@ import {
 	useContext,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { api } from "@/lib/api";
 import {
 	DEFAULT_TUTORIAL_STATE,
 	getTutorialState,
@@ -36,6 +38,9 @@ type TutorialStep = {
 	description: string;
 	selector?: string;
 	variant?: "standard" | "demo-launch";
+	allowRouteChanges?: boolean;
+	advanceWhenRouteMatches?: string;
+	hideNextButton?: boolean;
 };
 
 const TUTORIAL_STEPS: TutorialStep[] = [
@@ -44,7 +49,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 		route: "/",
 		title: "Welcome to WWII Sim Tutorial",
 		description:
-			"This website is quite complex, so this tutorial will walk you through all the features and give you all the tools you need to host your own simulations of your very own!",
+			"This tutorial will guide you through the main features of the simulation, as well as setting you up with the tools to host your own simulations with your friends or classmates!",
 		selector: '[data-tutorial="home-title"]',
 	},
 	{
@@ -68,7 +73,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 		route: "/",
 		title: "Start the demo",
 		description:
-			"Pick a country, we will create a fake game for you to try things out safely. In a real game, you would join your country by clicking the link sent to your email.",
+			"Pick a country, we will create a fake game for you to try things out safely. Then, you will create a real game that other people can connect to.",
 		selector: '[data-tutorial="home-demo-launch"]',
 		variant: "demo-launch",
 	},
@@ -77,7 +82,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 		route: "/game/assets?tutorial=1&tab=home",
 		title: "Country Dashboard",
 		description:
-			"This is the main country dashboard. The first page the player sees is the Assets page, where they can manage all the resources the country has and use such resources. The dock in the bottom allows them to switch between pages.",
+			"This is the main country dashboard. The first page the player sees is the Assets page, where they can manage all the resources the country has. The dock in the bottom allows them to switch between pages.",
 		selector: '[data-tutorial="game-shell-nav"]',
 	},
 	{
@@ -105,14 +110,6 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 		selector: '[data-tutorial="resource-history-trigger"]',
 	},
 	{
-		id: "user-management",
-		route: "/game/assets?tutorial=1&tab=user-management",
-		title: "Mod Dashboard",
-		description:
-			"During the game, moderators have access to a special Mod Dashboard where they can view every countries resources as well as their change log. It is their job to make sure countries are playing fairly and in a historically accurate way. One of the feature's shown here is the user management screen, where moderators can create users and assign them to countries.",
-		selector: '[data-tutorial="user-management-screen"]',
-	},
-	{
 		id: "announcements-feed",
 		route: "/game/announcements?tutorial=1",
 		title: "Announcement feed",
@@ -121,19 +118,87 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 		selector: '[data-tutorial="announcements-feed"]',
 	},
 	{
+		id: "host-login-setup",
+		route: "/game/join",
+		title: "Set up your host account",
+		description:
+			"Let's do this for real now. You will be logged in as with a host account, please wait.",
+		allowRouteChanges: true,
+		hideNextButton: true,
+	},
+	{
+		id: "create-new-game",
+		route: "/game/join",
+		title: "Create your own game",
+		description:
+			"There is no active game, Click Create New Game to start a new one.",
+		selector: '[data-tutorial="create-new-game"]',
+		allowRouteChanges: true,
+		advanceWhenRouteMatches: "/create",
+		hideNextButton: true,
+	},
+	{
+		id: "schedule-new-game",
+		route: "/create",
+		title: "Set your game schedule",
+		description:
+			"Choose the start date/time and year durations. This schedule controls when the game begins and how quickly each in-game year advances. Feel free to choose any start time as this only dictates what time the game us suppose to start. You can always start the game manually whenever you are ready.",
+		selector: '[data-tutorial="create-game-scheduling"]',
+		allowRouteChanges: true,
+		advanceWhenRouteMatches: "/game/join",
+		hideNextButton: true,
+	},
+	{
+		id: "open-manage-users",
+		route: "/game/join",
+		title: "Open user management",
+		description:
+			"A main feature of the website is its connectivity. To test this we will create a new account for you to simulate having multiple players. Now click Manage Users.",
+		selector: '[data-tutorial="manage-users-button"]',
+		allowRouteChanges: true,
+		advanceWhenRouteMatches: "/admin/users",
+		hideNextButton: true,
+	},
+	{
+		id: "create-and-assign-user",
+		route: "/admin/users",
+		title: "Login as new user on another device/session",
+		description:
+			"We have already created a new user for you. Please click the copy login link and open this on another device or incognito window to see the real-time connectivity features in action.",
+		selector: '[data-tutorial="manage-users-copy-login"]',
+	},
+	{
+		id: "start-game",
+		route: "/game/join",
+		title: "Start the game",
+		description:
+			"Go back to /game/join and click Start Game when you are ready.",
+		selector: '[data-tutorial="start-game-button"]',
+		advanceWhenRouteMatches: "/game/assets",
+		hideNextButton: true,
+	},
+	{
+		id: "mod-dashboard",
+		route: "/game/assets?tab=home",
+		title: "Mod Dashboard",
+		description:
+			"You can monitor different countries from here. Use this selector to switch dashboards and review each country's state.",
+		selector: '[data-tutorial="mod-country-selector"]',
+	},
+	{
 		id: "auto-update",
-		route: "/game/assets?tutorial=1&tab=home",
+		route: "/game/assets?tab=home",
 		title: "Data Syncs in Real-Time",
 		description:
-			"Since multiple players can be working together to manage a country, dashboard uses websockets to deliver updates in real time. Every change automatically syncs across all players in the country, as well as the moderators.",
+			"On your other device/session change a number, then watch this dashboard update in real time. If the countries are the same, the mod dashboard reflects those changes immediately.",
 		selector: '[data-tutorial="assets-overview"]',
 	},
 	{
 		id: "free-play",
-		route: "/game/assets?tutorial=1&tab=home",
+		route: "/game/assets?tab=home",
 		title: "You are now ready",
 		description:
-			"You are now free to explore the dashboard on your own. In demo mode, you cannot play with other people. If you would like to host a game of your own with other people, please click the button below.",
+			"You have completed the guided setup. Continue exploring and running your game on your own.",
 		selector: '[data-tutorial="game-shell-nav"]',
 	},
 ];
@@ -178,6 +243,9 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 		DEFAULT_TUTORIAL_STATE.demoCountry,
 	);
 	const [spotlightRect, setSpotlightRect] = useState<DOMRect | null>(null);
+	const hasTriggeredHostLoginRef = useRef(false);
+	const hasCompletedHostSetupRef = useRef(false);
+	const hostSetupInFlightRef = useRef(false);
 	const currentStep = isActive ? TUTORIAL_STEPS[currentStepIndex] : null;
 
 	const persistState = useCallback((partial: Partial<TutorialState>) => {
@@ -189,20 +257,29 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 	const dismissTutorial = useCallback(() => {
 		setIsActive(false);
 		setSpotlightRect(null);
+		hasTriggeredHostLoginRef.current = false;
+		hasCompletedHostSetupRef.current = false;
+		hostSetupInFlightRef.current = false;
 		persistState({ dismissed: true, demoMode: false });
 	}, [persistState]);
 
 	const finishTutorial = useCallback(() => {
 		setIsActive(false);
 		setSpotlightRect(null);
-		persistState({ completed: true, dismissed: false, demoMode: true });
-		router.push("/game/assets?tutorial=1&tab=home");
+		hasTriggeredHostLoginRef.current = false;
+		hasCompletedHostSetupRef.current = false;
+		hostSetupInFlightRef.current = false;
+		persistState({ completed: true, dismissed: false, demoMode: false });
+		router.push("/game/assets?tab=home");
 	}, [persistState, router]);
 
 	const startTutorial = useCallback(() => {
 		setIsActive(true);
 		setCurrentStepIndex(0);
 		setSpotlightRect(null);
+		hasTriggeredHostLoginRef.current = false;
+		hasCompletedHostSetupRef.current = false;
+		hostSetupInFlightRef.current = false;
 		const nextState = persistState({
 			hasSeenIntro: true,
 			dismissed: false,
@@ -258,10 +335,115 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 			pathname,
 			new URLSearchParams(searchParams.toString()),
 		);
-		if (!matches) {
+		if (!matches && !currentStep.allowRouteChanges) {
 			router.push(currentStep.route);
 		}
 	}, [currentStep, isActive, pathname, router, searchParams]);
+
+	useEffect(() => {
+		if (!currentStep?.advanceWhenRouteMatches || !isActive) return;
+		const matches = routeMatches(
+			currentStep.advanceWhenRouteMatches,
+			pathname,
+			new URLSearchParams(searchParams.toString()),
+		);
+		if (!matches) return;
+		goToStep(currentStepIndex + 1);
+	}, [
+		currentStep,
+		currentStepIndex,
+		goToStep,
+		isActive,
+		pathname,
+		searchParams,
+	]);
+
+	useEffect(() => {
+		if (!isActive || currentStep?.id !== "host-login-setup") return;
+
+		if (!hasTriggeredHostLoginRef.current) {
+			hasTriggeredHostLoginRef.current = true;
+			persistState({ demoMode: false, dismissed: false });
+			router.push("/login?id=ufp3zhfaqd1c1b6f5jv2jduh");
+			return;
+		}
+
+		if (hasCompletedHostSetupRef.current || hostSetupInFlightRef.current) {
+			return;
+		}
+		if (pathname === "/login") return;
+
+		const userId = getUserId();
+		if (!userId) return;
+
+		let isCancelled = false;
+		hostSetupInFlightRef.current = true;
+
+		const stopExistingGameIfNeeded = async () => {
+			try {
+				const currentGameResponse = await api.game.current.get({
+					query: { authorization: userId },
+				});
+				if (currentGameResponse.error) {
+					console.error("Failed to fetch current game before tutorial setup.");
+					return;
+				}
+
+				if (currentGameResponse.data.exists && currentGameResponse.data.game) {
+					const stopResponse = await api
+						.game({ gameId: String(currentGameResponse.data.game.id) })
+						.stop.patch(
+							{},
+							{
+								query: { authorization: userId },
+							},
+						);
+					if (stopResponse.error) {
+						console.error(
+							"Failed to stop existing game before tutorial setup.",
+						);
+						return;
+					}
+
+					const gameAfterStopResponse = await api.game.current.get({
+						query: { authorization: userId },
+					});
+					if (
+						gameAfterStopResponse.error ||
+						gameAfterStopResponse.data.exists
+					) {
+						console.error(
+							"Game is still running after stop attempt during tutorial setup.",
+						);
+						return;
+					}
+				}
+			} catch (error) {
+				console.error("Error preparing host tutorial setup:", error);
+			} finally {
+				hostSetupInFlightRef.current = false;
+			}
+
+			if (isCancelled) return;
+			hasCompletedHostSetupRef.current = true;
+			router.replace("/game/join");
+			goToStep(currentStepIndex + 1);
+		};
+
+		void stopExistingGameIfNeeded();
+
+		return () => {
+			isCancelled = true;
+		};
+	}, [
+		currentStep?.id,
+		currentStepIndex,
+		goToStep,
+		isActive,
+		persistState,
+		pathname,
+		router,
+	]);
 
 	useEffect(() => {
 		if (!isActive || !currentStep?.selector) {
@@ -288,15 +470,29 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 				}
 			}
 			if (!element) {
-				setSpotlightRect(null);
+				setSpotlightRect((previousRect) =>
+					previousRect === null ? previousRect : null,
+				);
 				return;
 			}
 			const rect = element.getBoundingClientRect();
 			if (rect.width === 0 || rect.height === 0) {
-				setSpotlightRect(null);
+				setSpotlightRect((previousRect) =>
+					previousRect === null ? previousRect : null,
+				);
 				return;
 			}
-			setSpotlightRect(rect);
+			setSpotlightRect((previousRect) => {
+				if (!previousRect) return rect;
+				const hasMoved =
+					Math.abs(previousRect.top - rect.top) > 0.5 ||
+					Math.abs(previousRect.left - rect.left) > 0.5;
+				const hasResized =
+					Math.abs(previousRect.width - rect.width) > 0.5 ||
+					Math.abs(previousRect.height - rect.height) > 0.5;
+				if (!hasMoved && !hasResized) return previousRect;
+				return rect;
+			});
 		};
 		const scheduleSpotlightUpdate = () => {
 			if (frameId !== null) return;
@@ -311,7 +507,6 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 		mutationObserver.observe(document.body, {
 			childList: true,
 			subtree: true,
-			attributes: true,
 		});
 		return () => {
 			window.removeEventListener("resize", scheduleSpotlightUpdate);
@@ -413,16 +608,6 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 									</Button>
 								</div>
 							)}
-							{currentStep.id === "free-play" && (
-								<Button
-									onClick={() => {
-										dismissTutorial();
-										router.push("/login?id=ufp3zhfaqd1c1b6f5jv2jduh");
-									}}
-								>
-									Host a Game
-								</Button>
-							)}
 						</CardContent>
 						<CardFooter className="justify-between gap-2">
 							<div className="flex gap-2">
@@ -433,13 +618,14 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 								>
 									Back
 								</Button>
-								{currentStep.variant !== "demo-launch" && (
-									<Button onClick={moveNext}>
-										{currentStepIndex === TUTORIAL_STEPS.length - 1
-											? "Finish"
-											: "Next"}
-									</Button>
-								)}
+								{currentStep.variant !== "demo-launch" &&
+									!currentStep.hideNextButton && (
+										<Button onClick={moveNext}>
+											{currentStepIndex === TUTORIAL_STEPS.length - 1
+												? "Finish"
+												: "Next"}
+										</Button>
+									)}
 							</div>
 							{currentStepIndex !== TUTORIAL_STEPS.length - 1 && (
 								<Button variant="ghost" onClick={dismissTutorial}>
