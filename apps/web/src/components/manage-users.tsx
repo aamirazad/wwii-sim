@@ -395,6 +395,7 @@ function UserCard({
 							render={
 								<Button
 									variant="outline"
+									disabled={user.username === "flavortown"}
 									role="combobox"
 									aria-expanded={open}
 									className="w-full justify-between"
