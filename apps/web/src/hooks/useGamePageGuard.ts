@@ -1,6 +1,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import type { GameState, UserState } from "@/app/game/GameContext";
+import { useTutorial } from "@/components/tutorial-provider";
 
 /**
  * Page access requirements
@@ -50,6 +51,11 @@ export function useGamePageGuard({
 	userState,
 }: UseGamePageGuardOptions) {
 	const router = useRouter();
+	const { isActive: isTutorialActive, currentStepId } = useTutorial();
+	const shouldStayOnJoinForTutorial =
+		isTutorialActive &&
+		(currentStepId === "host-login-setup" ||
+			currentStepId === "create-new-game");
 
 	useEffect(() => {
 		// Don't redirect while still loading
@@ -117,6 +123,12 @@ export function useGamePageGuard({
 		if (requires === "waiting-game") {
 			if (gameState.status === "has-game") {
 				const gameStatus = gameState.game.status;
+				if (
+					shouldStayOnJoinForTutorial &&
+					(gameStatus === "active" || gameStatus === "paused")
+				) {
+					return;
+				}
 
 				// Active game: go to resources
 				if (gameStatus === "active") {
@@ -131,5 +143,5 @@ export function useGamePageGuard({
 				}
 			}
 		}
-	}, [gameState, userState, requires, router]);
+	}, [gameState, userState, requires, router, shouldStayOnJoinForTutorial]);
 }

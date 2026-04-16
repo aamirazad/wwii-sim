@@ -1,6 +1,7 @@
 "use client";
 
 import { PLAYABLE_COUNTRIES, type PlayableCountry } from "@api/schema";
+import { useQueryClient } from "@tanstack/react-query";
 import { Compass, Play, SkipForward } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -215,6 +216,7 @@ interface TutorialContextValue {
 const TutorialContext = createContext<TutorialContextValue | undefined>(
 	undefined,
 );
+const SPOTLIGHT_SYNC_INTERVAL_MS = 200;
 
 function routeMatches(
 	targetRoute: string,
@@ -230,6 +232,7 @@ function routeMatches(
 }
 
 export function TutorialProvider({ children }: { children: ReactNode }) {
+	const queryClient = useQueryClient();
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
@@ -270,8 +273,8 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 		hasCompletedHostSetupRef.current = false;
 		hostSetupInFlightRef.current = false;
 		persistState({ completed: true, dismissed: false, demoMode: false });
-		router.push("/game/assets?tab=home");
-	}, [persistState, router]);
+		window.location.assign("/game/assets?tab=home");
+	}, [persistState]);
 
 	const startTutorial = useCallback(() => {
 		setIsActive(true);
@@ -379,17 +382,29 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 		let isCancelled = false;
 		hostSetupInFlightRef.current = true;
 
-		const stopExistingGameIfNeeded = async () => {
+		const ensureNoRunningGame = async () => {
 			try {
-				const currentGameResponse = await api.game.current.get({
-					query: { authorization: userId },
-				});
-				if (currentGameResponse.error) {
-					console.error("Failed to fetch current game before tutorial setup.");
-					return;
-				}
+				for (let attempt = 0; attempt < 10; attempt++) {
+					const currentGameResponse = await api.game.current.get({
+						query: { authorization: userId },
+					});
+					if (currentGameResponse.error) {
+						console.error(
+							"Failed to fetch current game before tutorial setup.",
+						);
+						return false;
+					}
+					if (
+						!currentGameResponse.data.exists ||
+						!currentGameResponse.data.game
+					) {
+						queryClient.setQueryData(
+							["game", "current"],
+							currentGameResponse.data,
+						);
+						return true;
+					}
 
-				if (currentGameResponse.data.exists && currentGameResponse.data.game) {
 					const stopResponse = await api
 						.game({ gameId: String(currentGameResponse.data.game.id) })
 						.stop.patch(
@@ -402,32 +417,31 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 						console.error(
 							"Failed to stop existing game before tutorial setup.",
 						);
-						return;
+						return false;
 					}
-
-					const gameAfterStopResponse = await api.game.current.get({
-						query: { authorization: userId },
-					});
-					if (
-						gameAfterStopResponse.error ||
-						gameAfterStopResponse.data.exists
-					) {
-						console.error(
-							"Game is still running after stop attempt during tutorial setup.",
-						);
-						return;
-					}
+					await new Promise((resolve) => setTimeout(resolve, 300));
 				}
+				console.error(
+					"Game is still running after stop attempt during tutorial setup.",
+				);
+				return false;
 			} catch (error) {
 				console.error("Error preparing host tutorial setup:", error);
+				return false;
+			}
+		};
+
+		const stopExistingGameIfNeeded = async () => {
+			try {
+				const gameStopped = await ensureNoRunningGame();
+				if (!gameStopped || isCancelled) return;
+				await queryClient.invalidateQueries({ queryKey: ["game", "current"] });
+				hasCompletedHostSetupRef.current = true;
+				router.replace("/game/join");
+				goToStep(currentStepIndex + 1);
 			} finally {
 				hostSetupInFlightRef.current = false;
 			}
-
-			if (isCancelled) return;
-			hasCompletedHostSetupRef.current = true;
-			router.replace("/game/join");
-			goToStep(currentStepIndex + 1);
 		};
 
 		void stopExistingGameIfNeeded();
@@ -442,6 +456,7 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 		isActive,
 		persistState,
 		pathname,
+		queryClient,
 		router,
 	]);
 
@@ -452,6 +467,7 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 		}
 
 		let frameId: number | null = null;
+		let intervalId: number | null = null;
 		let observedElement: Element | null = null;
 		let resizeObserver: ResizeObserver | null = null;
 		const updateSpotlight = () => {
@@ -498,20 +514,19 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 			if (frameId !== null) return;
 			frameId = window.requestAnimationFrame(updateSpotlight);
 		};
-		const mutationObserver = new MutationObserver(() => {
-			scheduleSpotlightUpdate();
-		});
 		updateSpotlight();
+		intervalId = window.setInterval(
+			scheduleSpotlightUpdate,
+			SPOTLIGHT_SYNC_INTERVAL_MS,
+		);
 		window.addEventListener("resize", scheduleSpotlightUpdate);
 		window.addEventListener("scroll", scheduleSpotlightUpdate, true);
-		mutationObserver.observe(document.body, {
-			childList: true,
-			subtree: true,
-		});
 		return () => {
 			window.removeEventListener("resize", scheduleSpotlightUpdate);
 			window.removeEventListener("scroll", scheduleSpotlightUpdate, true);
-			mutationObserver.disconnect();
+			if (intervalId !== null) {
+				window.clearInterval(intervalId);
+			}
 			resizeObserver?.disconnect();
 			if (frameId !== null) {
 				window.cancelAnimationFrame(frameId);
