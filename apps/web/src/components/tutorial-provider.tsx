@@ -165,7 +165,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 		route: "/admin/users",
 		title: "Login as new user on another device/session",
 		description:
-			"We have already created a new user for you. Please click the copy login link and open this on another device or incognito window to see the real-time connectivity features in action.",
+			"We have already created a new user for you. Please click the copy login link and open this on another device or incognito window to see the real-time connectivity features in action. Make sure you do not open this link in the same window you are currently in because that will log you out of your host account and log you in as a player.",
 		selector: '[data-tutorial="manage-users-copy-login"]',
 	},
 	{
