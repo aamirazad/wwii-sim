@@ -144,7 +144,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 		title: "Set your game schedule",
 		description:
 			"Choose the start date/time and year durations. This schedule controls when the game begins and how quickly each in-game year advances. Feel free to choose any start time as this only dictates what time the game us suppose to start. You can always start the game manually whenever you are ready.",
-		selector: '[data-tutorial="create-game-scheduling"]',
+		selector: '[data-tutorial="create-game-submit"]',
 		allowRouteChanges: true,
 		advanceWhenRouteMatches: "/game/join",
 		hideNextButton: true,
@@ -217,6 +217,145 @@ const TutorialContext = createContext<TutorialContextValue | undefined>(
 	undefined,
 );
 const SPOTLIGHT_SYNC_INTERVAL_MS = 200;
+const TUTORIAL_CARD_MARGIN_PX = 8;
+const TUTORIAL_CARD_GAP_PX = 12;
+
+type Rectangle = {
+	top: number;
+	left: number;
+	right: number;
+	bottom: number;
+	width: number;
+	height: number;
+};
+
+type TutorialCardPosition = {
+	top: number;
+	left: number;
+};
+
+function clamp(value: number, min: number, max: number): number {
+	if (value < min) return min;
+	if (value > max) return max;
+	return value;
+}
+
+function getOverlapArea(first: Rectangle, second: Rectangle): number {
+	const overlapWidth = Math.max(
+		0,
+		Math.min(first.right, second.right) - Math.max(first.left, second.left),
+	);
+	const overlapHeight = Math.max(
+		0,
+		Math.min(first.bottom, second.bottom) - Math.max(first.top, second.top),
+	);
+	return overlapWidth * overlapHeight;
+}
+
+function getTutorialCardPosition({
+	viewportWidth,
+	viewportHeight,
+	cardWidth,
+	cardHeight,
+	targetRect,
+}: {
+	viewportWidth: number;
+	viewportHeight: number;
+	cardWidth: number;
+	cardHeight: number;
+	targetRect: DOMRect | null;
+}): TutorialCardPosition {
+	const maxLeft = Math.max(
+		TUTORIAL_CARD_MARGIN_PX,
+		viewportWidth - cardWidth - TUTORIAL_CARD_MARGIN_PX,
+	);
+	const maxTop = Math.max(
+		TUTORIAL_CARD_MARGIN_PX,
+		viewportHeight - cardHeight - TUTORIAL_CARD_MARGIN_PX,
+	);
+
+	const clampPosition = (left: number, top: number): TutorialCardPosition => ({
+		left: clamp(left, TUTORIAL_CARD_MARGIN_PX, maxLeft),
+		top: clamp(top, TUTORIAL_CARD_MARGIN_PX, maxTop),
+	});
+
+	const fallbackPosition = clampPosition(maxLeft, maxTop);
+	if (!targetRect) {
+		return fallbackPosition;
+	}
+
+	const target: Rectangle = {
+		top: targetRect.top,
+		left: targetRect.left,
+		right: targetRect.right,
+		bottom: targetRect.bottom,
+		width: targetRect.width,
+		height: targetRect.height,
+	};
+
+	const candidates = [
+		clampPosition(target.left, target.bottom + TUTORIAL_CARD_GAP_PX),
+		clampPosition(
+			target.right - cardWidth,
+			target.bottom + TUTORIAL_CARD_GAP_PX,
+		),
+		clampPosition(target.left, target.top - cardHeight - TUTORIAL_CARD_GAP_PX),
+		clampPosition(
+			target.right - cardWidth,
+			target.top - cardHeight - TUTORIAL_CARD_GAP_PX,
+		),
+		clampPosition(
+			target.right + TUTORIAL_CARD_GAP_PX,
+			target.top + target.height / 2 - cardHeight / 2,
+		),
+		clampPosition(
+			target.left - cardWidth - TUTORIAL_CARD_GAP_PX,
+			target.top + target.height / 2 - cardHeight / 2,
+		),
+		fallbackPosition,
+		clampPosition(TUTORIAL_CARD_MARGIN_PX, maxTop),
+		clampPosition(maxLeft, TUTORIAL_CARD_MARGIN_PX),
+		clampPosition(TUTORIAL_CARD_MARGIN_PX, TUTORIAL_CARD_MARGIN_PX),
+	];
+
+	let bestPosition = fallbackPosition;
+	let bestScore = Number.POSITIVE_INFINITY;
+	const paddedTarget: Rectangle = {
+		top: target.top - 4,
+		left: target.left - 4,
+		right: target.right + 4,
+		bottom: target.bottom + 4,
+		width: target.width + 8,
+		height: target.height + 8,
+	};
+	const targetCenterX = target.left + target.width / 2;
+	const targetCenterY = target.top + target.height / 2;
+
+	for (const candidate of candidates) {
+		const candidateRect: Rectangle = {
+			top: candidate.top,
+			left: candidate.left,
+			right: candidate.left + cardWidth,
+			bottom: candidate.top + cardHeight,
+			width: cardWidth,
+			height: cardHeight,
+		};
+		const overlapArea = getOverlapArea(candidateRect, paddedTarget);
+		const candidateCenterX = candidateRect.left + cardWidth / 2;
+		const candidateCenterY = candidateRect.top + cardHeight / 2;
+		const distanceFromTargetCenter = Math.hypot(
+			targetCenterX - candidateCenterX,
+			targetCenterY - candidateCenterY,
+		);
+		const score = overlapArea * 1_000_000 + distanceFromTargetCenter;
+		if (score < bestScore) {
+			bestScore = score;
+			bestPosition = candidate;
+		}
+	}
+
+	return bestPosition;
+}
 
 function routeMatches(
 	targetRoute: string,
@@ -246,9 +385,12 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 		DEFAULT_TUTORIAL_STATE.demoCountry,
 	);
 	const [spotlightRect, setSpotlightRect] = useState<DOMRect | null>(null);
+	const [tutorialCardPosition, setTutorialCardPosition] =
+		useState<TutorialCardPosition | null>(null);
 	const hasTriggeredHostLoginRef = useRef(false);
 	const hasCompletedHostSetupRef = useRef(false);
 	const hostSetupInFlightRef = useRef(false);
+	const tutorialCardRef = useRef<HTMLDivElement | null>(null);
 	const currentStep = isActive ? TUTORIAL_STEPS[currentStepIndex] : null;
 
 	const persistState = useCallback((partial: Partial<TutorialState>) => {
@@ -541,6 +683,69 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 		};
 	}, [currentStep, isActive]);
 
+	useEffect(() => {
+		if (!isActive || !currentStep) {
+			setTutorialCardPosition(null);
+			return;
+		}
+
+		let frameId: number | null = null;
+		let resizeObserver: ResizeObserver | null = null;
+
+		const updateCardPosition = () => {
+			frameId = null;
+			const cardElement = tutorialCardRef.current;
+			if (!cardElement) return;
+
+			const cardRect = cardElement.getBoundingClientRect();
+			const nextPosition = getTutorialCardPosition({
+				viewportWidth: window.innerWidth,
+				viewportHeight: window.innerHeight,
+				cardWidth: cardRect.width,
+				cardHeight: cardRect.height,
+				targetRect: spotlightRect,
+			});
+
+			setTutorialCardPosition((previousPosition) => {
+				if (
+					previousPosition &&
+					Math.abs(previousPosition.top - nextPosition.top) <= 0.5 &&
+					Math.abs(previousPosition.left - nextPosition.left) <= 0.5
+				) {
+					return previousPosition;
+				}
+				return nextPosition;
+			});
+		};
+
+		const scheduleCardPositionUpdate = () => {
+			if (frameId !== null) return;
+			frameId = window.requestAnimationFrame(updateCardPosition);
+		};
+
+		scheduleCardPositionUpdate();
+
+		const cardElement = tutorialCardRef.current;
+		if (cardElement) {
+			resizeObserver = new ResizeObserver(() => {
+				scheduleCardPositionUpdate();
+			});
+			resizeObserver.observe(cardElement);
+		}
+
+		window.addEventListener("resize", scheduleCardPositionUpdate);
+		window.addEventListener("scroll", scheduleCardPositionUpdate, true);
+
+		return () => {
+			window.removeEventListener("resize", scheduleCardPositionUpdate);
+			window.removeEventListener("scroll", scheduleCardPositionUpdate, true);
+			resizeObserver?.disconnect();
+			if (frameId !== null) {
+				window.cancelAnimationFrame(frameId);
+			}
+		};
+	}, [currentStep, isActive, spotlightRect]);
+
 	const spotlightStyle = useMemo(() => {
 		if (!spotlightRect) return undefined;
 		const padding = 8;
@@ -556,6 +761,16 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 			boxShadow: "0 0 0 9999px rgba(2, 6, 23, 0.78)",
 		};
 	}, [spotlightRect]);
+
+	const tutorialCardStyle = useMemo(() => {
+		if (tutorialCardPosition) {
+			return tutorialCardPosition;
+		}
+		return {
+			bottom: TUTORIAL_CARD_MARGIN_PX,
+			right: TUTORIAL_CARD_MARGIN_PX,
+		};
+	}, [tutorialCardPosition]);
 
 	const isDemoMode =
 		persistedState.demoMode ||
@@ -593,70 +808,76 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 					) : (
 						<div className="fixed inset-0 z-70 bg-slate-950/75" />
 					)}
-					<Card className="fixed bottom-4 right-4 z-80 w-[min(30rem,calc(100vw-1rem))] border-primary/40 bg-background/95 shadow-2xl backdrop-blur">
-						<CardHeader className="pb-2">
-							<CardTitle className="text-lg">{currentStep.title}</CardTitle>
-							<CardDescription>{currentStep.description}</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-3">
-							{currentStep.id === "home-countries" && (
-								<p className="text-sm text-muted-foreground">
-									{PLAYABLE_COUNTRIES.join(" · ")}
-								</p>
-							)}
-							{currentStep.variant === "demo-launch" && (
-								<div className="space-y-2">
-									<p className="text-xs uppercase tracking-wide text-muted-foreground">
-										Demo country
+					<div
+						ref={tutorialCardRef}
+						style={tutorialCardStyle}
+						className="fixed z-80 w-[min(30rem,calc(100vw-1rem))]"
+					>
+						<Card className="border-primary/40 bg-background/95 shadow-2xl backdrop-blur">
+							<CardHeader className="pb-2">
+								<CardTitle className="text-lg">{currentStep.title}</CardTitle>
+								<CardDescription>{currentStep.description}</CardDescription>
+							</CardHeader>
+							<CardContent className="max-h-[calc(100vh-11rem)] space-y-3 overflow-y-auto">
+								{currentStep.id === "home-countries" && (
+									<p className="text-sm text-muted-foreground">
+										{PLAYABLE_COUNTRIES.join(" · ")}
 									</p>
-									<select
-										value={demoCountry}
-										onChange={(event) => {
-											const country = event.target.value as PlayableCountry;
-											setDemoCountry(country);
-											persistState({ demoCountry: country });
-										}}
-										className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-									>
-										{PLAYABLE_COUNTRIES.map((country) => (
-											<option key={country} value={country}>
-												{country}
-											</option>
-										))}
-									</select>
-									<Button onClick={beginDemoLaunch} className="w-full">
-										<Play className="mr-2 h-4 w-4" />
-										Launch demo session
-									</Button>
-								</div>
-							)}
-						</CardContent>
-						<CardFooter className="justify-between gap-2">
-							<div className="flex gap-2">
-								<Button
-									variant="outline"
-									onClick={() => goToStep(currentStepIndex - 1)}
-									disabled={currentStepIndex === 0}
-								>
-									Back
-								</Button>
-								{currentStep.variant !== "demo-launch" &&
-									!currentStep.hideNextButton && (
-										<Button onClick={moveNext}>
-											{currentStepIndex === TUTORIAL_STEPS.length - 1
-												? "Finish"
-												: "Next"}
+								)}
+								{currentStep.variant === "demo-launch" && (
+									<div className="space-y-2">
+										<p className="text-xs uppercase tracking-wide text-muted-foreground">
+											Demo country
+										</p>
+										<select
+											value={demoCountry}
+											onChange={(event) => {
+												const country = event.target.value as PlayableCountry;
+												setDemoCountry(country);
+												persistState({ demoCountry: country });
+											}}
+											className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+										>
+											{PLAYABLE_COUNTRIES.map((country) => (
+												<option key={country} value={country}>
+													{country}
+												</option>
+											))}
+										</select>
+										<Button onClick={beginDemoLaunch} className="w-full">
+											<Play className="mr-2 h-4 w-4" />
+											Launch demo session
 										</Button>
-									)}
-							</div>
-							{currentStepIndex !== TUTORIAL_STEPS.length - 1 && (
-								<Button variant="ghost" onClick={dismissTutorial}>
-									<SkipForward className="mr-1 h-4 w-4" />
-									Skip
-								</Button>
-							)}
-						</CardFooter>
-					</Card>
+									</div>
+								)}
+							</CardContent>
+							<CardFooter className="justify-between gap-2">
+								<div className="flex gap-2">
+									<Button
+										variant="outline"
+										onClick={() => goToStep(currentStepIndex - 1)}
+										disabled={currentStepIndex === 0}
+									>
+										Back
+									</Button>
+									{currentStep.variant !== "demo-launch" &&
+										!currentStep.hideNextButton && (
+											<Button onClick={moveNext}>
+												{currentStepIndex === TUTORIAL_STEPS.length - 1
+													? "Finish"
+													: "Next"}
+											</Button>
+										)}
+								</div>
+								{currentStepIndex !== TUTORIAL_STEPS.length - 1 && (
+									<Button variant="ghost" onClick={dismissTutorial}>
+										<SkipForward className="mr-1 h-4 w-4" />
+										Skip
+									</Button>
+								)}
+							</CardFooter>
+						</Card>
+					</div>
 				</>
 			)}
 		</TutorialContext.Provider>
