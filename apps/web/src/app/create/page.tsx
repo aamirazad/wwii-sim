@@ -48,7 +48,9 @@ export default function CreateGamePage() {
 	const [open, setOpen] = useState(false);
 
 	// Form state
-	const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+	const [startDate, setStartDate] = useState<Date | undefined>(
+		() => new Date(),
+	);
 	const [startTime, setStartTime] = useState<string>("07:37:15");
 	const [yearDurations, setYearDurations] = useState(() => {
 		const durations: { [key: string]: number } = {};
