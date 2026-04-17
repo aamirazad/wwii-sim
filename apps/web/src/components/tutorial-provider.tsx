@@ -143,7 +143,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 		route: "/create",
 		title: "Set your game schedule",
 		description:
-			"Choose the start date/time and year durations. This schedule controls when the game begins and how quickly each in-game year advances. Feel free to choose any start time as this only dictates what time the game us suppose to start. You can always start the game manually whenever you are ready.",
+			"Here, you can choose when the game is scheduled to start and year durations. Based on what is selected here the years will change automatically, but mods can always edit this. This default is good, create the game now",
 		selector: '[data-tutorial="create-game-submit"]',
 		allowRouteChanges: true,
 		advanceWhenRouteMatches: "/game/join",
