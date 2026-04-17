@@ -2,7 +2,7 @@
 
 ## Setup commands
 - Install deps: `bun install`
-- Do not start the dev server
+- Do not start the dev server. Do not run `bun run build`
 - Run linter `bun lint`
 - Write linter suggestions `bun lint --write`
 

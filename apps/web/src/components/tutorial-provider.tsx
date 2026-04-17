@@ -326,10 +326,17 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 
 	useEffect(() => {
 		if (!isHydrated || isActive) return;
+		if (pathname !== "/") return;
 		if (getUserId()) return;
 		if (persistedState.hasSeenIntro) return;
 		startTutorial();
-	}, [isActive, isHydrated, persistedState.hasSeenIntro, startTutorial]);
+	}, [
+		isActive,
+		isHydrated,
+		pathname,
+		persistedState.hasSeenIntro,
+		startTutorial,
+	]);
 
 	useEffect(() => {
 		if (!currentStep || !isActive) return;

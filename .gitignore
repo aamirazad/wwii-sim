@@ -28,6 +28,7 @@ build
 dist
 apps/api/server
 *.sqlite
+server.exe
 
 # Debug
 npm-debug.log*

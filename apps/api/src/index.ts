@@ -1181,6 +1181,18 @@ const app = new Elysia()
 					},
 				}),
 			);
+			app.server?.publish(
+				"country:Mods",
+				JSON.stringify({
+					type: "server.country.resources",
+					country: countryName,
+					resources: {
+						oil: updatedCountry.oil,
+						steel: updatedCountry.steel,
+						population: updatedCountry.population,
+					},
+				}),
+			);
 
 			if (error) {
 				set.status = 400;
@@ -1648,7 +1660,23 @@ const app = new Elysia()
 				}),
 			);
 			app.server?.publish(
+				"country:Mods",
+				JSON.stringify({
+					type: "server.country.resources",
+					country: tradeOutcome.initiatorName,
+					resources: tradeOutcome.initiatorResources,
+				}),
+			);
+			app.server?.publish(
 				`country:${tradeOutcome.recipientName}`,
+				JSON.stringify({
+					type: "server.country.resources",
+					country: tradeOutcome.recipientName,
+					resources: tradeOutcome.recipientResources,
+				}),
+			);
+			app.server?.publish(
+				"country:Mods",
 				JSON.stringify({
 					type: "server.country.resources",
 					country: tradeOutcome.recipientName,
@@ -2055,6 +2083,18 @@ const app = new Elysia()
 					},
 				}),
 			);
+			app.server?.publish(
+				"country:Mods",
+				JSON.stringify({
+					type: "server.country.resources",
+					country: countryName,
+					resources: {
+						oil: updatedCountry.oil,
+						steel: updatedCountry.steel,
+						population: updatedCountry.population,
+					},
+				}),
+			);
 
 			return { error: false as const };
 		},
@@ -2212,6 +2252,18 @@ const app = new Elysia()
 				const countryName = country.name as Country;
 				app.server?.publish(
 					`country:${countryName}`,
+					JSON.stringify({
+						type: "server.country.resources",
+						country: countryName,
+						resources: {
+							oil: updatedCountry.oil,
+							steel: updatedCountry.steel,
+							population: updatedCountry.population,
+						},
+					}),
+				);
+				app.server?.publish(
+					"country:Mods",
 					JSON.stringify({
 						type: "server.country.resources",
 						country: countryName,
