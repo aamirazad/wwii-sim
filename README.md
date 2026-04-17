@@ -10,25 +10,26 @@ The HASD History Club WWII Simulation is a game for students playing a country i
 
 The best way to learn about the site is to complete the tutorial. To go <https://sim.aamirazad.com> to start!
 
-https://github.com/user-attachments/assets/a1dc7788-5198-4004-917b-b18522819c37
+*Demonstrating the tutorial*
+
+https://github.com/user-attachments/assets/203e4243-b606-4aa4-95ef-16513ae0c631
 
 *Working with troops*
 
-https://github.com/user-attachments/assets/8108c342-3315-49ef-b467-286d684c5933
-
-*Demonstrating the tutorial*
-
-https://github.com/user-attachments/assets/3e7cd425-46c2-463d-8545-fe9f5d63d3c3
+https://github.com/user-attachments/assets/a1dc7788-5198-4004-917b-b18522819c37
 
 *Game progress automatically*
 
-<img width="464" height="548" alt="image" src="https://github.com/user-attachments/assets/e8b9d937-651d-4c86-b175-66df4de83c15" />
+https://github.com/user-attachments/assets/3e7cd425-46c2-463d-8545-fe9f5d63d3c3
 
 *Profile card generated when you login to the site*
 
-<img width="800" height="597" alt="image" src="https://github.com/user-attachments/assets/1e10cdad-082c-41bd-8286-e746c774d14d" />
+<img width="464" height="548" alt="image" src="https://github.com/user-attachments/assets/e8b9d937-651d-4c86-b175-66df4de83c15" />
 
 *People using the website at my school*
+
+<img width="800" height="597" alt="image" src="https://github.com/user-attachments/assets/1e10cdad-082c-41bd-8286-e746c774d14d" />
+
 
 ## Development
 
