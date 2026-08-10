@@ -36,6 +36,7 @@ import { type SubmitEvent, Suspense, useEffect, useState } from "react";
 import { useGame } from "@/app/game/GameContext";
 import CountryDashboard from "@/components/country-dashboard";
 import GoBack from "@/components/go-back";
+import { InlineHelp } from "@/components/inline-help";
 import LoadingSpinner from "@/components/loading-spinner";
 import ManageUsers from "@/components/manage-users";
 import { useTutorial } from "@/components/tutorial-provider";
@@ -317,7 +318,10 @@ function ResourceChangeForm({
 				].map(
 					({ id, label, value, setValue, resulting, setResulting, base }) => (
 						<div key={id} className="space-y-2">
-							<Label htmlFor={id}>{label} Change</Label>
+							<Label htmlFor={id} className="flex items-center gap-1.5">
+								{label} Change{" "}
+								<InlineHelp text="Basic math is allowed here: +, −, ×, ÷, and parentheses. For example, 12*3 or -(8+2)." />
+							</Label>
 							<Input
 								id={id}
 								type="text"

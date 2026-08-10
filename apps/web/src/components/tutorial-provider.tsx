@@ -2,7 +2,7 @@
 
 import { PLAYABLE_COUNTRIES, type PlayableCountry } from "@api/schema";
 import { useQueryClient } from "@tanstack/react-query";
-import { Compass, Play, SkipForward } from "lucide-react";
+import { Play, SkipForward } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
 	createContext,
@@ -378,7 +378,6 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 	const [persistedState, setPersistedState] = useState<TutorialState>(
 		DEFAULT_TUTORIAL_STATE,
 	);
-	const [isHydrated, setIsHydrated] = useState(false);
 	const [isActive, setIsActive] = useState(false);
 	const [currentStepIndex, setCurrentStepIndex] = useState(0);
 	const [demoCountry, setDemoCountry] = useState<PlayableCountry>(
@@ -460,25 +459,10 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 	}, [currentStepIndex, demoCountry, goToStep, persistState]);
 
 	useEffect(() => {
-		setIsHydrated(true);
 		const currentState = getTutorialState();
 		setPersistedState(currentState);
 		setDemoCountry(currentState.demoCountry);
 	}, []);
-
-	useEffect(() => {
-		if (!isHydrated || isActive) return;
-		if (pathname !== "/") return;
-		if (getUserId()) return;
-		if (persistedState.hasSeenIntro) return;
-		startTutorial();
-	}, [
-		isActive,
-		isHydrated,
-		pathname,
-		persistedState.hasSeenIntro,
-		startTutorial,
-	]);
 
 	useEffect(() => {
 		if (!currentStep || !isActive) return;
@@ -788,16 +772,6 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
 	return (
 		<TutorialContext.Provider value={contextValue}>
 			{children}
-			{isHydrated && !isActive && persistedState.hasSeenIntro && (
-				<Button
-					onClick={startTutorial}
-					className="fixed bottom-4 right-4 z-60 shadow-xl"
-					variant="secondary"
-				>
-					<Compass className="mr-2 h-4 w-4" />
-					Replay tutorial
-				</Button>
-			)}
 			{isActive && currentStep && (
 				<>
 					{spotlightStyle ? (

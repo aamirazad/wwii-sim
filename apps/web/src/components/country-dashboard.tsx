@@ -13,6 +13,7 @@ import {
 	Grip,
 	Megaphone,
 	MoveRight,
+	ScrollText,
 	Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -22,6 +23,7 @@ import { useGame } from "@/app/game/GameContext";
 import Dock from "@/components/dock";
 import ExternalLink from "@/components/external-link";
 import FullAlert from "@/components/full-alert";
+import { HelpDrawer } from "@/components/help-drawer";
 import ManageUsers from "@/components/manage-users";
 import { useTutorial } from "@/components/tutorial-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -265,6 +267,11 @@ export default function CountryDashboard({
 	const tutorialQuery = isDemoMode ? "?tutorial=1" : "";
 	const dockItems = [
 		{
+			icon: <ScrollText size={24} />,
+			label: "Briefing",
+			href: `/game/briefing${tutorialQuery}`,
+		},
+		{
 			icon: <CircleGauge size={24} />,
 			label: "Assets",
 			href: `/game/assets${tutorialQuery}`,
@@ -331,9 +338,9 @@ export default function CountryDashboard({
 	return (
 		<div data-tutorial="game-shell-nav" className="flex flex-col grow relative">
 			{/* Top Bar */}
-			<header className="w-full pt-4 px-8 pb-3 flex justify-between items-center">
+			<header className="w-full px-6 pb-3 pt-4 sm:px-8 flex justify-between items-center">
 				<div className="flex items-baseline gap-4">
-					<h1 className="text-5xl font-black tracking-tighter uppercase text-white leading-none">
+					<h1 className="font-serif text-3xl font-bold tracking-tight text-foreground leading-none sm:text-4xl">
 						{country}
 					</h1>
 					<div className="flex items-center gap-2">
@@ -341,7 +348,7 @@ export default function CountryDashboard({
 							<MoveRight size={24} />
 						</div>
 						<p
-							className="cursor-pointer font-bold text-zinc-400 uppercase"
+							className="cursor-pointer text-sm font-semibold text-muted-foreground"
 							onClick={() => {
 								router.push(
 									dockItems.filter((item) => item.label === tab)[0].href,
@@ -355,6 +362,7 @@ export default function CountryDashboard({
 				</div>
 
 				<div className="flex items-center gap-3">
+					<HelpDrawer page={tab} />
 					{(isAdmin || isMod) && gameState.status === "has-game" && (
 						<TooltipProvider>
 							<Popover>
@@ -484,7 +492,7 @@ export default function CountryDashboard({
 							</Popover>
 						</TooltipProvider>
 					)}
-					<p className="text-3xl font-mono font-bold text-white drop-shadow-lg">
+					<p className="font-mono text-2xl font-bold text-foreground">
 						{currentYear}
 					</p>
 					<Tooltip>
@@ -501,13 +509,15 @@ export default function CountryDashboard({
 					</Tooltip>
 				</div>
 			</header>
-			<div className="mx-6 grow flex backdrop-brightness-50 backdrop-blur-3xl border border-white/10 rounded-xl shadow-2xl overflow-hidden relative">
+			<div className="mx-4 grow flex overflow-hidden rounded-sm border bg-background/95 shadow-lg relative sm:mx-6">
 				{/* Inner Content */}
-				<div className="p-8 h-full overflow-auto w-full">{children}</div>
+				<div className="h-full w-full overflow-auto p-5 sm:p-8">{children}</div>
 			</div>
 
 			<div className="flex">
-				<div className="p-4 grow flex gap-1 ml-4 text-zinc-400">{userName}</div>
+				<div className="ml-4 flex grow gap-1 p-4 text-muted-foreground">
+					{userName}
+				</div>
 				<div className="hover:opacity-50 transition-color duration-300 opacity-0 text-sm sp pt-6 px-4">
 					{commitHash ? (
 						<p>

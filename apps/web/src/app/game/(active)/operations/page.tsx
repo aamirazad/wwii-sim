@@ -10,6 +10,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClipboardList, Crosshair, MapPin, Send } from "lucide-react";
 import { useMemo, useState } from "react";
 import CountryDashboard from "@/components/country-dashboard";
+import { InlineHelp } from "@/components/inline-help";
 import LoadingSpinner from "@/components/loading-spinner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -305,7 +306,10 @@ export default function OperationsPage() {
 										))}
 									</div>
 									<div className="space-y-2">
-										<Label>Detailed battle plan</Label>
+										<Label className="flex items-center gap-1.5">
+											Detailed battle plan{" "}
+											<InlineHelp text="Name routes, timing, supplies, support, fallback positions, and the exact territory you intend to hold. Moderators may award a planning bonus." />
+										</Label>
 										<Textarea
 											className="min-h-40"
 											value={plan}
@@ -337,7 +341,8 @@ export default function OperationsPage() {
 				<Card className={isMod ? "lg:col-span-2" : ""}>
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2">
-							<ClipboardList className="size-5" /> Public moderator queue
+							<ClipboardList className="size-5" /> Public moderator queue{" "}
+							<InlineHelp text="Everyone can see the request order and status. Full battle plans remain private to their country and the moderators." />
 						</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-3">
