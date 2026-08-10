@@ -44,6 +44,12 @@ export function getTutorialDemoData(
 		oil: resources.oil,
 		steel: resources.steel,
 		population: resources.population,
+		oilLevel: 7,
+		steelLevel: 7,
+		populationLevel: 7,
+		morale: 68,
+		tokens: 2,
+		lastProcessedYear: 1941,
 		createdAt: minutesAgo(180),
 		updatedAt: minutesAgo(1),
 	};
@@ -218,6 +224,9 @@ export function getTutorialDemoData(
 			gameId: countryState.gameId,
 			content:
 				"# Year 1941 briefing\nAll countries submit troop purchases before the timer expires.",
+			kind: "psa",
+			authorCountry: null,
+			year: 1941,
 			targetCountries: null,
 			createdBy: "Moderator Team",
 			createdAt: minutesAgo(50),
@@ -227,6 +236,9 @@ export function getTutorialDemoData(
 			gameId: countryState.gameId,
 			content:
 				"## Combat update\nFrontline losses have been posted. Check your resource and troop logs for exact numbers.",
+			kind: "psa",
+			authorCountry: null,
+			year: 1941,
 			targetCountries: null,
 			createdBy: "Battle Operations",
 			createdAt: minutesAgo(24),
@@ -236,6 +248,9 @@ export function getTutorialDemoData(
 			gameId: countryState.gameId,
 			content:
 				"### Moderator approval reminder\nTrade agreements and disputed troop movements require moderator confirmation.",
+			kind: "psa",
+			authorCountry: null,
+			year: 1941,
 			targetCountries: null,
 			createdBy: "Head Moderator",
 			createdAt: minutesAgo(10),

@@ -70,6 +70,7 @@ import {
 import { useGamePageGuard } from "@/hooks/useGamePageGuard";
 import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
+import { evaluateMathExpression } from "@/lib/math-expression";
 import {
 	loadTutorialDemoState,
 	saveTutorialDemoState,
@@ -91,10 +92,12 @@ function ResourceCard({
 	name,
 	value,
 	icon,
+	level,
 }: {
 	name: string;
 	value: string;
 	icon: React.ReactNode;
+	level?: number;
 }) {
 	return (
 		<Card className="flex-1">
@@ -108,6 +111,11 @@ function ResourceCard({
 				<div className="text-4xl truncate font-bold tracking-tight">
 					{value}
 				</div>
+				{level !== undefined && (
+					<p className="mt-1 text-sm text-muted-foreground">
+						Production level {level}
+					</p>
+				)}
 			</CardContent>
 		</Card>
 	);
@@ -185,11 +193,14 @@ function ResourceChangeForm({
 		setIsSubmitting(true);
 		setError(null);
 
-		const oilDelta = oilChange ? Number.parseInt(oilChange, 10) : 0;
-		const steelDelta = steelChange ? Number.parseInt(steelChange, 10) : 0;
-		const populationDelta = populationChange
-			? Number.parseInt(populationChange, 10)
-			: 0;
+		const oilDelta = evaluateMathExpression(oilChange);
+		const steelDelta = evaluateMathExpression(steelChange);
+		const populationDelta = evaluateMathExpression(populationChange);
+		if (oilDelta === null || steelDelta === null || populationDelta === null) {
+			setError("Use whole-number math with +, -, *, /, and parentheses");
+			setIsSubmitting(false);
+			return;
+		}
 
 		if (oilDelta === 0 && steelDelta === 0 && populationDelta === 0) {
 			setError("Please enter at least one resource change");
@@ -309,17 +320,16 @@ function ResourceChangeForm({
 							<Label htmlFor={id}>{label} Change</Label>
 							<Input
 								id={id}
-								type="number"
-								min={-999999}
-								max={999999}
-								placeholder="+50 or -10"
+								type="text"
+								placeholder="+50, 12*3, or -(8+2)"
 								value={value}
-								className={`transition-all  duration-200 ${Number(value) < 0 ? "text-rose-300" : "text-emerald-300"}`}
+								className={`transition-all duration-200 ${(evaluateMathExpression(value) ?? 0) < 0 ? "text-rose-300" : "text-emerald-300"}`}
 								onChange={(e) => {
 									const v = e.target.value;
 									setValue(v);
 									if (!(usesInfiniteUsOil && id === "oil")) {
-										setResulting(base + Number(v));
+										const evaluated = evaluateMathExpression(v);
+										if (evaluated !== null) setResulting(base + evaluated);
 									}
 								}}
 							/>
@@ -557,8 +567,10 @@ function TradingForm({
 	>("");
 	const [initiatorOil, setInitiatorOil] = useState("");
 	const [initiatorSteel, setInitiatorSteel] = useState("");
+	const [initiatorPopulation, setInitiatorPopulation] = useState("");
 	const [recipientOil, setRecipientOil] = useState("");
 	const [recipientSteel, setRecipientSteel] = useState("");
+	const [recipientPopulation, setRecipientPopulation] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -589,11 +601,19 @@ function TradingForm({
 	const recipientSteelValue = recipientSteel
 		? Number.parseInt(recipientSteel, 10)
 		: 0;
+	const initiatorPopulationValue = initiatorPopulation
+		? Number.parseInt(initiatorPopulation, 10)
+		: 0;
+	const recipientPopulationValue = recipientPopulation
+		? Number.parseInt(recipientPopulation, 10)
+		: 0;
 	const totalResources =
 		initiatorOilValue +
 		initiatorSteelValue +
+		initiatorPopulationValue +
 		recipientOilValue +
-		recipientSteelValue;
+		recipientSteelValue +
+		recipientPopulationValue;
 	const tradeCost = Math.ceil(totalResources / 4);
 
 	const handleCreateTrade = async (e: SubmitEvent<HTMLFormElement>) => {
@@ -612,8 +632,10 @@ function TradingForm({
 		if (
 			initiatorOilValue < 0 ||
 			initiatorSteelValue < 0 ||
+			initiatorPopulationValue < 0 ||
 			recipientOilValue < 0 ||
-			recipientSteelValue < 0
+			recipientSteelValue < 0 ||
+			recipientPopulationValue < 0
 		) {
 			setError("Trade amounts cannot be negative");
 			return;
@@ -635,10 +657,12 @@ function TradingForm({
 						initiatorResources: {
 							oil: initiatorOilValue,
 							steel: initiatorSteelValue,
+							population: initiatorPopulationValue,
 						},
 						recipientResources: {
 							oil: recipientOilValue,
 							steel: recipientSteelValue,
+							population: recipientPopulationValue,
 						},
 					},
 					{ query: { authorization: userId } },
@@ -650,8 +674,10 @@ function TradingForm({
 			setRecipientCountryName("");
 			setInitiatorOil("");
 			setInitiatorSteel("");
+			setInitiatorPopulation("");
 			setRecipientOil("");
 			setRecipientSteel("");
+			setRecipientPopulation("");
 			refetch();
 			onSuccess();
 		} catch {
@@ -728,7 +754,7 @@ function TradingForm({
 								</SelectContent>
 							</Select>
 						</div>
-						<div className="grid grid-cols-2 gap-4">
+						<div className="grid gap-4 md:grid-cols-3">
 							<div className="space-y-2">
 								<Label>Oil you send</Label>
 								<Input
@@ -745,6 +771,15 @@ function TradingForm({
 									min={0}
 									value={initiatorSteel}
 									onChange={(e) => setInitiatorSteel(e.target.value)}
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label>Population you send</Label>
+								<Input
+									type="number"
+									min={0}
+									value={initiatorPopulation}
+									onChange={(e) => setInitiatorPopulation(e.target.value)}
 								/>
 							</div>
 							<div className="space-y-2">
@@ -765,10 +800,19 @@ function TradingForm({
 									onChange={(e) => setRecipientSteel(e.target.value)}
 								/>
 							</div>
+							<div className="space-y-2">
+								<Label>Population you receive</Label>
+								<Input
+									type="number"
+									min={0}
+									value={recipientPopulation}
+									onChange={(e) => setRecipientPopulation(e.target.value)}
+								/>
+							</div>
 						</div>
 						<p className="text-sm text-muted-foreground">
-							Trade fee: {tradeCost} oil (paid by initiator on acceptance).
-							Steel requirement to initiate: {tradeCost}.
+							Transport fee: {tradeCost} oil and {tradeCost} steel, paid by the
+							initiator when the other country accepts.
 						</p>
 						{error && <p className="text-sm text-destructive">{error}</p>}
 						<Button
@@ -843,14 +887,16 @@ function TradeRequestCard({
 			</div>
 			<div className="text-xs text-muted-foreground">
 				Sends: {trade.initiatorResources.steel} steel,{" "}
-				{trade.initiatorResources.oil} oil
+				{trade.initiatorResources.oil} oil,{" "}
+				{trade.initiatorResources.population} population
 			</div>
 			<div className="text-xs text-muted-foreground">
 				Receives: {trade.recipientResources.steel} steel,{" "}
-				{trade.recipientResources.oil} oil
+				{trade.recipientResources.oil} oil,{" "}
+				{trade.recipientResources.population} population
 			</div>
 			<div className="text-xs text-muted-foreground">
-				Fee: {trade.oilCost} oil, Steel requirement: {trade.steelRequirement}
+				Fee: {trade.oilCost} oil and {trade.steelRequirement} steel
 			</div>
 			{onPrimaryAction && onSecondaryAction && (
 				<div className="flex gap-2 pt-1">
@@ -1063,6 +1109,12 @@ function TroopPurchaseForm({
 
 	return (
 		<form onSubmit={handleSubmit} className="space-y-6">
+			{countryState.name === "Russia" && (
+				<p className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
+					Russian mobilization produces two dice for every troop die purchased.
+					Research bonuses are applied before the multiplier.
+				</p>
+			)}
 			{/* Purchase quantities */}
 			<div>
 				<h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -1241,6 +1293,7 @@ function TroopLocationEditor({
 	onSuccess: () => void;
 	onDemoSubmit?: (payload: {
 		locations: {
+			id?: number;
 			name: string;
 			isHome: boolean;
 			troops: TroopCounts;
@@ -1251,12 +1304,14 @@ function TroopLocationEditor({
 	const userId = getUserId();
 
 	type EditableLocation = {
+		id?: number;
 		name: string;
 		isHome: boolean;
 		troops: TroopCounts;
 	};
 	const [editLocations, setEditLocations] = useState<EditableLocation[]>(
 		locations.map((l) => ({
+			id: l.id,
 			name: l.name,
 			isHome: l.isHome,
 			troops: Object.fromEntries(
@@ -1271,6 +1326,7 @@ function TroopLocationEditor({
 	useEffect(() => {
 		setEditLocations(
 			locations.map((l) => ({
+				id: l.id,
 				name: l.name,
 				isHome: l.isHome,
 				troops: Object.fromEntries(
@@ -1370,6 +1426,7 @@ function TroopLocationEditor({
 		const nextLocations = editLocations
 			.filter((l) => l.name.trim() !== "")
 			.map((l) => ({
+				id: l.id,
 				name: l.name.trim(),
 				isHome: l.isHome,
 				troops: l.troops,
@@ -1472,6 +1529,7 @@ function TroopLocationEditor({
 										onChange={(e) =>
 											updateLocation(idx, "name", e.target.value)
 										}
+										disabled={loc.id !== undefined}
 									/>
 								</div>
 								<div className="flex items-center gap-1.5 text-sm">
@@ -1855,6 +1913,7 @@ function LiveAssets() {
 								name="Steel"
 								value={displayResources.steel.toLocaleString()}
 								icon={<Hammer className="h-5 w-5" />}
+								level={countryState.steelLevel}
 							/>
 							<ResourceCard
 								name="Oil"
@@ -1864,12 +1923,26 @@ function LiveAssets() {
 										: displayResources.oil.toLocaleString()
 								}
 								icon={<Droplets className="h-5 w-5" />}
+								level={countryState.oilLevel}
 							/>
 							<ResourceCard
 								name="Population"
 								value={displayResources.population.toLocaleString()}
 								icon={<Users className="h-5 w-5" />}
+								level={countryState.populationLevel}
 							/>
+						</div>
+						<div className="flex flex-wrap gap-x-6 gap-y-2 border-y py-3 text-sm">
+							<span>
+								<strong>Morale:</strong> {countryState.morale}/100
+							</span>
+							<span>
+								<strong>Country tokens:</strong> {countryState.tokens}
+							</span>
+							<span className="text-muted-foreground">
+								Levels and annual resources update automatically when the year
+								advances.
+							</span>
 						</div>
 
 						{tab === "home" && (

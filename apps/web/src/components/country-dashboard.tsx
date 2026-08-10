@@ -1,12 +1,14 @@
 "use client";
 
 import {
+	BookOpen,
 	CalendarClock,
 	CircleGauge,
 	CirclePause,
 	CirclePlay,
 	CircleX,
 	ClockArrowUp,
+	Crosshair,
 	ExternalLinkIcon,
 	Grip,
 	Megaphone,
@@ -271,6 +273,16 @@ export default function CountryDashboard({
 			icon: <Megaphone size={24} />,
 			label: "Message Board",
 			href: `/game/announcements${tutorialQuery}`,
+		},
+		{
+			icon: <Crosshair size={24} />,
+			label: "Operations",
+			href: `/game/operations${tutorialQuery}`,
+		},
+		{
+			icon: <BookOpen size={24} />,
+			label: "Research",
+			href: `/game/research${tutorialQuery}`,
 		},
 	];
 

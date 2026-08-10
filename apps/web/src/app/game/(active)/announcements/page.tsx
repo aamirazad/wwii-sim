@@ -1,6 +1,10 @@
 "use client";
 
-import type { Announcement, PlayableCountry } from "@api/schema";
+import type {
+	Announcement,
+	AnnouncementReply,
+	PlayableCountry,
+} from "@api/schema";
 import { PLAYABLE_COUNTRIES } from "@api/schema";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Globe, Megaphone, Send, Trash2, Users } from "lucide-react";
@@ -61,13 +65,19 @@ function AnnouncementCard({
 	isMod,
 	onDelete,
 	isDeleting,
+	replies = [],
+	onReply,
 }: {
 	announcement: Announcement;
 	index: number;
 	isMod: boolean;
 	onDelete: (announcementId: number) => Promise<void>;
 	isDeleting: boolean;
+	replies?: AnnouncementReply[];
+	onReply?: (announcementId: number, content: string) => Promise<void>;
 }) {
+	const [reply, setReply] = useState("");
+	const [isReplying, setIsReplying] = useState(false);
 	const formattedDate = new Date(announcement.createdAt).toLocaleString(
 		undefined,
 		{
@@ -302,13 +312,53 @@ function AnnouncementCard({
 					<div className="prose prose-invert prose-sm max-w-none">
 						{renderContent(announcement.content)}
 					</div>
+					<div className="mt-4 border-t pt-4 space-y-3">
+						{replies.map((item) => (
+							<div key={item.id} className="border-l-2 border-primary/40 pl-3">
+								<p className="text-sm text-foreground">{item.content}</p>
+								<p className="mt-1 text-xs text-muted-foreground">
+									{item.authorCountry} · {item.createdBy}
+								</p>
+							</div>
+						))}
+						{onReply && (
+							<form
+								className="flex gap-2"
+								onSubmit={async (event) => {
+									event.preventDefault();
+									if (!reply.trim()) return;
+									setIsReplying(true);
+									await onReply(announcement.id, reply.trim());
+									setReply("");
+									setIsReplying(false);
+								}}
+							>
+								<input
+									className="h-9 min-w-0 flex-1 rounded-md border bg-transparent px-3 text-sm"
+									placeholder="Reply to this announcement"
+									value={reply}
+									onChange={(event) => setReply(event.target.value)}
+									maxLength={1000}
+								/>
+								<Button size="sm" disabled={isReplying || !reply.trim()}>
+									Reply
+								</Button>
+							</form>
+						)}
+					</div>
 				</CardContent>
 			</Card>
 		</motion.div>
 	);
 }
 
-function AnnouncementForm({ gameId }: { gameId: number }) {
+function AnnouncementForm({
+	gameId,
+	isMod,
+}: {
+	gameId: number;
+	isMod: boolean;
+}) {
 	const userId = getUserId();
 	const queryClient = useQueryClient();
 	const [content, setContent] = useState("");
@@ -364,25 +414,33 @@ function AnnouncementForm({ gameId }: { gameId: number }) {
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2">
 					<Megaphone className="h-5 w-5" />
-					Create Announcement
+					{isMod ? "Publish PSA" : "Country Announcement"}
 				</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<form onSubmit={handleSubmit} className="space-y-4">
-					<div className="space-y-2">
-						<Label htmlFor="content">Message</Label>
-						<Textarea
-							id="content"
-							placeholder="Write your announcement here..."
-							value={content}
-							onChange={(e) => setContent(e.target.value)}
-							className="min-h-37.5 font-mono text-sm"
-							required
-						/>
+					{isMod && (
+						<div className="space-y-2">
+							<Label htmlFor="content">Message</Label>
+							<Textarea
+								id="content"
+								placeholder="Write your announcement here..."
+								value={content}
+								onChange={(e) => setContent(e.target.value)}
+								className="min-h-37.5 font-mono text-sm"
+								required
+							/>
+							<p className="text-xs text-muted-foreground">
+								Supports headings (#, ##, ###), **bold**, and *italic*
+								formatting
+							</p>
+						</div>
+					)}
+					{!isMod && (
 						<p className="text-xs text-muted-foreground">
-							Supports headings (#, ##, ###), **bold**, and *italic* formatting
+							Your country may publish three global announcements each year.
 						</p>
-					</div>
+					)}
 
 					<div className="space-y-2">
 						<Label>Target Countries</Label>
@@ -464,6 +522,19 @@ function LiveAnnouncementsPage() {
 		},
 		enabled: !!userId && gameState.status === "has-game",
 	});
+	const { data: repliesData } = useQuery({
+		queryKey: ["announcement-replies", gameState],
+		queryFn: async () => {
+			if (!userId || gameState.status !== "has-game")
+				throw new Error("Not ready");
+			const response = await api
+				.game({ gameId: String(gameState.game.id) })
+				["announcement-replies"].get({ query: { authorization: userId } });
+			if (response.error) throw new Error("Failed to fetch replies");
+			return response.data;
+		},
+		enabled: !!userId && gameState.status === "has-game",
+	});
 
 	// Subscribe to new announcements
 	useEffect(() => {
@@ -537,10 +608,21 @@ function LiveAnnouncementsPage() {
 		}
 	};
 
+	const handleReply = async (announcementId: number, content: string) => {
+		if (!userId || gameState.status !== "has-game") return;
+		const response = await api
+			.game({ gameId: String(gameState.game.id) })
+			.announcements({ announcementId: String(announcementId) })
+			.replies.post({ content }, { query: { authorization: userId } });
+		if (!response.error) {
+			queryClient.invalidateQueries({ queryKey: ["announcement-replies"] });
+		}
+	};
+
 	return (
 		<CountryDashboard tab="Message Board">
 			<div className="max-w-3xl mx-auto">
-				{isMod && <AnnouncementForm gameId={gameState.game.id} />}
+				<AnnouncementForm gameId={gameState.game.id} isMod={isMod} />
 				{!isMod && (
 					<Card className="mb-6" data-tutorial="announcements-mod-help">
 						<CardHeader>
@@ -629,6 +711,14 @@ function LiveAnnouncementsPage() {
 									isMod={isMod}
 									onDelete={handleDeleteAnnouncement}
 									isDeleting={deletingAnnouncementId === announcement.id}
+									replies={
+										repliesData && !repliesData.error
+											? repliesData.replies.filter(
+													(reply) => reply.announcementId === announcement.id,
+												)
+											: []
+									}
+									onReply={handleReply}
 								/>
 							))
 					)}

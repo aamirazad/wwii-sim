@@ -5,6 +5,8 @@ import { Elysia, t } from "elysia";
 import packageJson from "../package.json";
 import { db } from "./db";
 import {
+	actionRequestTable,
+	announcementRepliesTable,
 	announcementsTable,
 	type Country,
 	countryStateTable,
@@ -13,6 +15,8 @@ import {
 	gamesTable,
 	PLAYABLE_COUNTRIES,
 	type PlayableCountry,
+	researchRequestTable,
+	researchStateTable,
 	resourceChangeLogTable,
 	tradeRequestTable,
 	troopChangeLogTable,
@@ -21,6 +25,15 @@ import {
 	usersTable,
 } from "./db/schema";
 import {
+	COUNTRY_RULES,
+	RESEARCH_RULES,
+	RESEARCH_TYPES,
+	type ResearchType,
+} from "./game-rules";
+import {
+	ActionRequestStatusSchema,
+	ActionRequestTypeSchema,
+	AnnouncementReplySchema,
 	AnnouncementSchema,
 	ClientMessageSchema,
 	CountrySchema,
@@ -30,6 +43,7 @@ import {
 	ExtendedGameSchema,
 	GameSchema,
 	PlayableCountrySchema,
+	ResearchTypeSchema,
 	ResourceChangeLogSchema,
 	ServerMessageSchema,
 	TROOP_COSTS,
@@ -48,14 +62,18 @@ import { yearScheduler } from "./services/year-scheduler";
 const calculateTradeCosts = (resources: {
 	initiatorOil: number;
 	initiatorSteel: number;
+	initiatorPopulation: number;
 	recipientOil: number;
 	recipientSteel: number;
+	recipientPopulation: number;
 }) => {
 	const totalResources =
 		resources.initiatorOil +
 		resources.initiatorSteel +
+		resources.initiatorPopulation +
 		resources.recipientOil +
-		resources.recipientSteel;
+		resources.recipientSteel +
+		resources.recipientPopulation;
 	const oilCost = Math.ceil(totalResources / 4);
 	return {
 		totalResources,
@@ -512,6 +530,7 @@ const app = new Elysia()
 			const countryStates = [];
 			for (const countryName of PLAYABLE_COUNTRIES) {
 				const countryConfig = body.countries[countryName];
+				const countryRules = COUNTRY_RULES[countryName];
 				const [countryState] = await db
 					.insert(countryStateTable)
 					.values({
@@ -520,6 +539,12 @@ const app = new Elysia()
 						oil: countryConfig.oil,
 						steel: countryConfig.steel,
 						population: countryConfig.population,
+						oilLevel: 5,
+						steelLevel: 5,
+						populationLevel: 5,
+						morale: countryRules.startingMorale,
+						tokens: countryRules.startingTokens,
+						lastProcessedYear: 1938,
 						createdAt: new Date(),
 						updatedAt: new Date(),
 					})
@@ -538,6 +563,37 @@ const app = new Elysia()
 						changedBy: "system",
 						createdAt: new Date(),
 					});
+
+					for (const researchType of RESEARCH_TYPES) {
+						const startingLevel =
+							countryRules.startingResearch[researchType] ?? 0;
+						await db.insert(researchStateTable).values({
+							gameId: newGame.id,
+							countryStateId: countryState.id,
+							researchType,
+							level: startingLevel,
+							startingLevel,
+							updatedAt: new Date(),
+						});
+					}
+
+					for (const location of countryRules.startingTroops) {
+						await db.insert(troopLocationTable).values({
+							countryStateId: countryState.id,
+							gameId: newGame.id,
+							name: location.name,
+							isHome: location.isHome,
+							infantry: location.troops.infantry ?? 0,
+							navalShips: location.troops.navalShips ?? 0,
+							aircraftCarriers: location.troops.aircraftCarriers ?? 0,
+							fighters: location.troops.fighters ?? 0,
+							bombers: location.troops.bombers ?? 0,
+							spies: location.troops.spies ?? 0,
+							submarines: location.troops.submarines ?? 0,
+							createdAt: new Date(),
+							updatedAt: new Date(),
+						});
+					}
 				}
 
 				countryStates.push({
@@ -547,6 +603,12 @@ const app = new Elysia()
 					oil: countryState.oil,
 					steel: countryState.steel,
 					population: countryState.population,
+					oilLevel: countryState.oilLevel,
+					steelLevel: countryState.steelLevel,
+					populationLevel: countryState.populationLevel,
+					morale: countryState.morale,
+					tokens: countryState.tokens,
+					lastProcessedYear: countryState.lastProcessedYear,
 					createdAt: countryState.createdAt,
 					updatedAt: countryState.updatedAt,
 				});
@@ -605,6 +667,12 @@ const app = new Elysia()
 					oil: c.oil,
 					steel: c.steel,
 					population: c.population,
+					oilLevel: c.oilLevel,
+					steelLevel: c.steelLevel,
+					populationLevel: c.populationLevel,
+					morale: c.morale,
+					tokens: c.tokens,
+					lastProcessedYear: c.lastProcessedYear,
 					createdAt: c.createdAt,
 					updatedAt: c.updatedAt,
 				})),
@@ -662,6 +730,12 @@ const app = new Elysia()
 					oil: country.oil,
 					steel: country.steel,
 					population: country.population,
+					oilLevel: country.oilLevel,
+					steelLevel: country.steelLevel,
+					populationLevel: country.populationLevel,
+					morale: country.morale,
+					tokens: country.tokens,
+					lastProcessedYear: country.lastProcessedYear,
 					createdAt: country.createdAt,
 					updatedAt: country.updatedAt,
 				},
@@ -1212,6 +1286,12 @@ const app = new Elysia()
 					oil: updatedCountry.oil,
 					steel: updatedCountry.steel,
 					population: updatedCountry.population,
+					oilLevel: updatedCountry.oilLevel,
+					steelLevel: updatedCountry.steelLevel,
+					populationLevel: updatedCountry.populationLevel,
+					morale: updatedCountry.morale,
+					tokens: updatedCountry.tokens,
+					lastProcessedYear: updatedCountry.lastProcessedYear,
 					createdAt: updatedCountry.createdAt,
 					updatedAt: updatedCountry.updatedAt,
 				},
@@ -1307,16 +1387,20 @@ const app = new Elysia()
 				initiatorResources: {
 					oil: trade.initiatorOil,
 					steel: trade.initiatorSteel,
+					population: trade.initiatorPopulation,
 				},
 				recipientResources: {
 					oil: trade.recipientOil,
 					steel: trade.recipientSteel,
+					population: trade.recipientPopulation,
 				},
 				...calculateTradeCosts({
 					initiatorOil: trade.initiatorOil,
 					initiatorSteel: trade.initiatorSteel,
+					initiatorPopulation: trade.initiatorPopulation,
 					recipientOil: trade.recipientOil,
 					recipientSteel: trade.recipientSteel,
+					recipientPopulation: trade.recipientPopulation,
 				}),
 				status: trade.status,
 				createdBy: trade.createdBy,
@@ -1399,8 +1483,10 @@ const app = new Elysia()
 			if (
 				body.initiatorResources.oil < 0 ||
 				body.initiatorResources.steel < 0 ||
+				body.initiatorResources.population < 0 ||
 				body.recipientResources.oil < 0 ||
-				body.recipientResources.steel < 0
+				body.recipientResources.steel < 0 ||
+				body.recipientResources.population < 0
 			) {
 				set.status = 400;
 				return {
@@ -1412,8 +1498,10 @@ const app = new Elysia()
 			const { totalResources, steelRequirement } = calculateTradeCosts({
 				initiatorOil: body.initiatorResources.oil,
 				initiatorSteel: body.initiatorResources.steel,
+				initiatorPopulation: body.initiatorResources.population,
 				recipientOil: body.recipientResources.oil,
 				recipientSteel: body.recipientResources.steel,
+				recipientPopulation: body.recipientResources.population,
 			});
 
 			if (totalResources <= 0) {
@@ -1438,8 +1526,10 @@ const app = new Elysia()
 				recipientCountryStateId: recipient.id,
 				initiatorOil: body.initiatorResources.oil,
 				initiatorSteel: body.initiatorResources.steel,
+				initiatorPopulation: body.initiatorResources.population,
 				recipientOil: body.recipientResources.oil,
 				recipientSteel: body.recipientResources.steel,
+				recipientPopulation: body.recipientResources.population,
 				status: "pending",
 				createdBy: user.id,
 				createdAt: new Date(),
@@ -1515,8 +1605,10 @@ const app = new Elysia()
 				const { oilCost, steelRequirement } = calculateTradeCosts({
 					initiatorOil: trade.initiatorOil,
 					initiatorSteel: trade.initiatorSteel,
+					initiatorPopulation: trade.initiatorPopulation,
 					recipientOil: trade.recipientOil,
 					recipientSteel: trade.recipientSteel,
+					recipientPopulation: trade.recipientPopulation,
 				});
 
 				if (initiator.oil < trade.initiatorOil + oilCost) {
@@ -1524,10 +1616,7 @@ const app = new Elysia()
 						error: "Initiating country does not have enough oil",
 					} as const;
 				}
-				if (
-					initiator.steel < trade.initiatorSteel ||
-					initiator.steel < steelRequirement
-				) {
+				if (initiator.steel < trade.initiatorSteel + steelRequirement) {
 					return {
 						error: "Initiating country does not meet steel requirements",
 					} as const;
@@ -1542,6 +1631,16 @@ const app = new Elysia()
 						error: "Recipient country does not have enough steel",
 					} as const;
 				}
+				if (initiator.population < trade.initiatorPopulation) {
+					return {
+						error: "Initiating country does not have enough population",
+					} as const;
+				}
+				if (recipient.population < trade.recipientPopulation) {
+					return {
+						error: "Recipient country does not have enough population",
+					} as const;
+				}
 
 				const [updatedInitiator] = await tx
 					.update(countryStateTable)
@@ -1549,7 +1648,14 @@ const app = new Elysia()
 						oil:
 							initiator.oil - trade.initiatorOil - oilCost + trade.recipientOil,
 						steel:
-							initiator.steel - trade.initiatorSteel + trade.recipientSteel,
+							initiator.steel -
+							trade.initiatorSteel -
+							steelRequirement +
+							trade.recipientSteel,
+						population:
+							initiator.population -
+							trade.initiatorPopulation +
+							trade.recipientPopulation,
 						updatedAt: new Date(),
 					})
 					.where(eq(countryStateTable.id, initiator.id))
@@ -1560,13 +1666,17 @@ const app = new Elysia()
 						oil: recipient.oil - trade.recipientOil + trade.initiatorOil,
 						steel:
 							recipient.steel - trade.recipientSteel + trade.initiatorSteel,
+						population:
+							recipient.population -
+							trade.recipientPopulation +
+							trade.initiatorPopulation,
 						updatedAt: new Date(),
 					})
 					.where(eq(countryStateTable.id, recipient.id))
 					.returning();
 
-				const tradeSummary = `Trade with ${recipient.name}: sent ${trade.initiatorSteel} steel and ${trade.initiatorOil} oil, received ${trade.recipientSteel} steel and ${trade.recipientOil} oil, paid ${oilCost} oil trade cost`;
-				const recipientSummary = `Trade with ${initiator.name}: sent ${trade.recipientSteel} steel and ${trade.recipientOil} oil, received ${trade.initiatorSteel} steel and ${trade.initiatorOil} oil`;
+				const tradeSummary = `Trade with ${recipient.name}: sent ${trade.initiatorSteel} steel, ${trade.initiatorOil} oil, and ${trade.initiatorPopulation} population; received ${trade.recipientSteel} steel, ${trade.recipientOil} oil, and ${trade.recipientPopulation} population; paid ${oilCost} oil and ${steelRequirement} steel transport cost`;
+				const recipientSummary = `Trade with ${initiator.name}: sent ${trade.recipientSteel} steel, ${trade.recipientOil} oil, and ${trade.recipientPopulation} population; received ${trade.initiatorSteel} steel, ${trade.initiatorOil} oil, and ${trade.initiatorPopulation} population`;
 
 				const initiatorDeltas = [
 					{
@@ -1581,6 +1691,12 @@ const app = new Elysia()
 						curr: updatedInitiator.steel,
 						note: tradeSummary,
 					},
+					{
+						type: "population" as const,
+						prev: initiator.population,
+						curr: updatedInitiator.population,
+						note: tradeSummary,
+					},
 				];
 				const recipientDeltas = [
 					{
@@ -1593,6 +1709,12 @@ const app = new Elysia()
 						type: "steel" as const,
 						prev: recipient.steel,
 						curr: updatedRecipient.steel,
+						note: recipientSummary,
+					},
+					{
+						type: "population" as const,
+						prev: recipient.population,
+						curr: updatedRecipient.population,
 						note: recipientSummary,
 					},
 				];
@@ -1773,6 +1895,562 @@ const app = new Elysia()
 			},
 		},
 	)
+	.get(
+		"/game/:gameId/country/:countryId/rules",
+		async ({ params, query, set }) => {
+			const countryId = Number.parseInt(params.countryId, 10);
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			const [country] = await db
+				.select()
+				.from(countryStateTable)
+				.where(eq(countryStateTable.id, countryId));
+			if (!user || !country) {
+				set.status = 404;
+				return { error: true as const, message: "Country not found" };
+			}
+			if (country.name === "Mods") {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: "Mods do not have country rules",
+				};
+			}
+			if (user.country !== country.name && user.country !== "Mods") {
+				set.status = 403;
+				return { error: true as const, message: "Unauthorized" };
+			}
+			return {
+				error: false as const,
+				rules: COUNTRY_RULES[country.name as PlayableCountry],
+				country,
+			};
+		},
+		{
+			params: t.Object({ gameId: t.String(), countryId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+		},
+	)
+	.patch(
+		"/game/:gameId/country/:countryId/stats",
+		async ({ params, query, body, set }) => {
+			const countryId = Number.parseInt(params.countryId, 10);
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			if (!user || (user.country !== "Mods" && user.role !== "admin")) {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only moderators can update stats",
+				};
+			}
+			const updates: Record<string, number | Date> = { updatedAt: new Date() };
+			if (body.morale !== undefined)
+				updates.morale = Math.min(100, Math.max(0, body.morale));
+			if (body.tokens !== undefined) updates.tokens = Math.max(0, body.tokens);
+			if (body.oilLevel !== undefined)
+				updates.oilLevel = Math.min(20, Math.max(1, body.oilLevel));
+			if (body.steelLevel !== undefined)
+				updates.steelLevel = Math.min(20, Math.max(1, body.steelLevel));
+			if (body.populationLevel !== undefined)
+				updates.populationLevel = Math.min(
+					20,
+					Math.max(1, body.populationLevel),
+				);
+			const [country] = await db
+				.update(countryStateTable)
+				.set(updates)
+				.where(eq(countryStateTable.id, countryId))
+				.returning();
+			if (!country) {
+				set.status = 404;
+				return { error: true as const, message: "Country not found" };
+			}
+			return { error: false as const, country };
+		},
+		{
+			params: t.Object({ gameId: t.String(), countryId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+			body: t.Object({
+				morale: t.Optional(t.Number()),
+				tokens: t.Optional(t.Number()),
+				oilLevel: t.Optional(t.Number()),
+				steelLevel: t.Optional(t.Number()),
+				populationLevel: t.Optional(t.Number()),
+			}),
+		},
+	)
+	.get(
+		"/game/:gameId/country/:countryId/research",
+		async ({ params, query, set }) => {
+			const countryId = Number.parseInt(params.countryId, 10);
+			const gameId = Number.parseInt(params.gameId, 10);
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			const [country] = await db
+				.select()
+				.from(countryStateTable)
+				.where(eq(countryStateTable.id, countryId));
+			if (
+				!user ||
+				!country ||
+				(user.country !== country.name && user.country !== "Mods")
+			) {
+				set.status = 403;
+				return { error: true as const, message: "Unauthorized" };
+			}
+			if (country.name === "Mods") {
+				set.status = 400;
+				return { error: true as const, message: "Invalid country" };
+			}
+			const states = await db
+				.select()
+				.from(researchStateTable)
+				.where(eq(researchStateTable.countryStateId, countryId));
+			const requests = await db
+				.select()
+				.from(researchRequestTable)
+				.where(
+					and(
+						eq(researchRequestTable.gameId, gameId),
+						eq(researchRequestTable.countryStateId, countryId),
+					),
+				);
+			const countryRules = COUNTRY_RULES[country.name as PlayableCountry];
+			return {
+				error: false as const,
+				states,
+				requests,
+				rules: RESEARCH_TYPES.map((researchType) => ({
+					researchType,
+					...RESEARCH_RULES[researchType],
+					cost: countryRules.researchCosts[researchType],
+				})),
+			};
+		},
+		{
+			params: t.Object({ gameId: t.String(), countryId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+		},
+	)
+	.post(
+		"/game/:gameId/country/:countryId/research",
+		async ({ params, query, body, set }) => {
+			const countryId = Number.parseInt(params.countryId, 10);
+			const gameId = Number.parseInt(params.gameId, 10);
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			const [country] = await db
+				.select()
+				.from(countryStateTable)
+				.where(eq(countryStateTable.id, countryId));
+			if (
+				!user ||
+				!country ||
+				(user.country !== country.name && user.country !== "Mods")
+			) {
+				set.status = 403;
+				return { error: true as const, message: "Unauthorized" };
+			}
+			if (country.name === "Mods") {
+				set.status = 400;
+				return { error: true as const, message: "Invalid country" };
+			}
+			const researchType = body.researchType as ResearchType;
+			const [state] = await db
+				.select()
+				.from(researchStateTable)
+				.where(
+					and(
+						eq(researchStateTable.countryStateId, countryId),
+						eq(researchStateTable.researchType, researchType),
+					),
+				);
+			if (!state) {
+				set.status = 404;
+				return { error: true as const, message: "Research state not found" };
+			}
+			if (state.level >= RESEARCH_RULES[researchType].maxLevel) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: "Research is already at its maximum level",
+				};
+			}
+			const [pending] = await db
+				.select()
+				.from(researchRequestTable)
+				.where(
+					and(
+						eq(researchRequestTable.countryStateId, countryId),
+						eq(researchRequestTable.researchType, researchType),
+						eq(researchRequestTable.status, "pending"),
+					),
+				);
+			if (pending) {
+				set.status = 409;
+				return {
+					error: true as const,
+					message: "This research already has a pending roll",
+				};
+			}
+			const cost =
+				COUNTRY_RULES[country.name as PlayableCountry].researchCosts[
+					researchType
+				];
+			if (country.steel < cost.steel || country.population < cost.population) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: "Not enough resources for this research",
+				};
+			}
+			const [request] = await db
+				.insert(researchRequestTable)
+				.values({
+					gameId,
+					countryStateId: countryId,
+					researchType,
+					targetLevel: state.level + 1,
+					steelCost: cost.steel,
+					populationCost: cost.population,
+					status: "pending",
+					plan: body.plan?.trim() || null,
+					createdBy: user.id,
+					createdAt: new Date(),
+				})
+				.returning();
+			return {
+				error: false as const,
+				request,
+				correctDiceNeeded: state.level - state.startingLevel + 1,
+			};
+		},
+		{
+			params: t.Object({ gameId: t.String(), countryId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+			body: t.Object({
+				researchType: ResearchTypeSchema,
+				plan: t.Optional(t.String()),
+			}),
+		},
+	)
+	.patch(
+		"/game/:gameId/country/:countryId/research/:requestId",
+		async ({ params, query, body, set }) => {
+			const countryId = Number.parseInt(params.countryId, 10);
+			const requestId = Number.parseInt(params.requestId, 10);
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			if (!user || (user.country !== "Mods" && user.role !== "admin")) {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only moderators can resolve research",
+				};
+			}
+			const result = await db.transaction(async (tx) => {
+				const [request] = await tx
+					.select()
+					.from(researchRequestTable)
+					.where(
+						and(
+							eq(researchRequestTable.id, requestId),
+							eq(researchRequestTable.countryStateId, countryId),
+							eq(researchRequestTable.status, "pending"),
+						),
+					);
+				if (!request)
+					return { error: "Pending research request not found" } as const;
+				const [country] = await tx
+					.select()
+					.from(countryStateTable)
+					.where(eq(countryStateTable.id, countryId));
+				const [state] = await tx
+					.select()
+					.from(researchStateTable)
+					.where(
+						and(
+							eq(researchStateTable.countryStateId, countryId),
+							eq(researchStateTable.researchType, request.researchType),
+						),
+					);
+				if (!country || !state)
+					return { error: "Country or research state not found" } as const;
+				const succeeds = body.status === "succeeded";
+				const steelCost = succeeds
+					? request.steelCost
+					: Math.ceil(request.steelCost / 2);
+				const populationCost = succeeds
+					? request.populationCost
+					: Math.ceil(request.populationCost / 2);
+				if (country.steel < steelCost || country.population < populationCost)
+					return { error: "Country no longer has enough resources" } as const;
+				const [updatedCountry] = await tx
+					.update(countryStateTable)
+					.set({
+						steel: country.steel - steelCost,
+						population: country.population - populationCost,
+						updatedAt: new Date(),
+					})
+					.where(eq(countryStateTable.id, countryId))
+					.returning();
+				for (const resource of ["steel", "population"] as const) {
+					if (country[resource] === updatedCountry[resource]) continue;
+					await tx.insert(resourceChangeLogTable).values({
+						countryStateId: countryId,
+						gameId: request.gameId,
+						resourceType: resource,
+						previousValue: country[resource],
+						newValue: updatedCountry[resource],
+						note: `${succeeds ? "Successful" : "Failed"} ${RESEARCH_RULES[request.researchType as ResearchType].label} research`,
+						changedBy: user.name,
+						createdAt: new Date(),
+					});
+				}
+				if (succeeds)
+					await tx
+						.update(researchStateTable)
+						.set({ level: request.targetLevel, updatedAt: new Date() })
+						.where(eq(researchStateTable.id, state.id));
+				await tx
+					.update(researchRequestTable)
+					.set({
+						status: body.status,
+						moderatorNote: body.moderatorNote?.trim() || null,
+						resolvedBy: user.id,
+						resolvedAt: new Date(),
+					})
+					.where(eq(researchRequestTable.id, request.id));
+				return { error: null, country: updatedCountry } as const;
+			});
+			if (result.error) {
+				set.status = 400;
+				return { error: true as const, message: result.error };
+			}
+			return { error: false as const, country: result.country };
+		},
+		{
+			params: t.Object({
+				gameId: t.String(),
+				countryId: t.String(),
+				requestId: t.String(),
+			}),
+			query: t.Object({ authorization: t.String() }),
+			body: t.Object({
+				status: t.Union([t.Literal("succeeded"), t.Literal("failed")]),
+				moderatorNote: t.Optional(t.String()),
+			}),
+		},
+	)
+	.get(
+		"/game/:gameId/actions",
+		async ({ params, query }) => {
+			const gameId = Number.parseInt(params.gameId, 10);
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			const requests = await db
+				.select({
+					request: actionRequestTable,
+					countryName: countryStateTable.name,
+					creatorName: usersTable.name,
+				})
+				.from(actionRequestTable)
+				.innerJoin(
+					countryStateTable,
+					eq(actionRequestTable.countryStateId, countryStateTable.id),
+				)
+				.leftJoin(usersTable, eq(actionRequestTable.createdBy, usersTable.id))
+				.where(eq(actionRequestTable.gameId, gameId))
+				.orderBy(actionRequestTable.createdAt);
+			return {
+				error: false as const,
+				actions: requests.map(({ request, countryName, creatorName }) => {
+					const canSeePrivate =
+						user?.country === "Mods" ||
+						user?.role === "admin" ||
+						user?.country === countryName;
+					const payload = request.payload ? { ...request.payload } : null;
+					if (payload && !canSeePrivate) delete payload.plan;
+					return {
+						...request,
+						payload,
+						countryName,
+						createdBy: creatorName ?? "Unknown",
+					};
+				}),
+			};
+		},
+		{
+			params: t.Object({ gameId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+		},
+	)
+	.post(
+		"/game/:gameId/country/:countryId/actions",
+		async ({ params, query, body, set }) => {
+			const gameId = Number.parseInt(params.gameId, 10);
+			const countryId = Number.parseInt(params.countryId, 10);
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			const [country] = await db
+				.select()
+				.from(countryStateTable)
+				.where(eq(countryStateTable.id, countryId));
+			if (
+				!user ||
+				!country ||
+				(user.country !== country.name && user.country !== "Mods")
+			) {
+				set.status = 403;
+				return { error: true as const, message: "Unauthorized" };
+			}
+			if (body.type === "battle") {
+				if (
+					!body.sourceLocationId ||
+					!body.targetLocation?.trim() ||
+					!body.highLow ||
+					!body.plan?.trim() ||
+					!body.troops
+				) {
+					set.status = 400;
+					return {
+						error: true as const,
+						message:
+							"Battle plans require a source, target, high/low choice, troop counts, and written plan",
+					};
+				}
+				const [location] = await db
+					.select()
+					.from(troopLocationTable)
+					.where(
+						and(
+							eq(troopLocationTable.id, body.sourceLocationId),
+							eq(troopLocationTable.countryStateId, countryId),
+						),
+					);
+				if (!location) {
+					set.status = 404;
+					return { error: true as const, message: "Source location not found" };
+				}
+				let total = 0;
+				for (const troopType of TROOP_TYPES) {
+					const amount = body.troops[troopType];
+					if (amount < 0 || amount > location[troopType]) {
+						set.status = 400;
+						return {
+							error: true as const,
+							message: `Invalid ${troopType} amount for ${location.name}`,
+						};
+					}
+					total += amount;
+				}
+				if (total === 0) {
+					set.status = 400;
+					return {
+						error: true as const,
+						message: "A battle plan must send at least one troop die",
+					};
+				}
+			}
+			const payload = {
+				sourceLocationId: body.sourceLocationId,
+				targetLocation: body.targetLocation,
+				targetCountry: body.targetCountry,
+				highLow: body.highLow,
+				troops: body.troops,
+				plan: body.plan,
+			};
+			const [request] = await db
+				.insert(actionRequestTable)
+				.values({
+					gameId,
+					countryStateId: countryId,
+					type: body.type,
+					title: body.title.trim(),
+					description: body.description.trim(),
+					payload,
+					status: "pending",
+					createdBy: user.id,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				})
+				.returning();
+			return { error: false as const, request };
+		},
+		{
+			params: t.Object({ gameId: t.String(), countryId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+			body: t.Object({
+				type: ActionRequestTypeSchema,
+				title: t.String({ minLength: 1, maxLength: 120 }),
+				description: t.String({ minLength: 1, maxLength: 4000 }),
+				sourceLocationId: t.Optional(t.Number()),
+				targetLocation: t.Optional(t.String()),
+				targetCountry: t.Optional(PlayableCountrySchema),
+				highLow: t.Optional(t.Union([t.Literal("high"), t.Literal("low")])),
+				troops: t.Optional(TroopCountsSchema),
+				plan: t.Optional(t.String()),
+			}),
+		},
+	)
+	.patch(
+		"/game/:gameId/actions/:actionId",
+		async ({ params, query, body, set }) => {
+			const actionId = Number.parseInt(params.actionId, 10);
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			if (!user || (user.country !== "Mods" && user.role !== "admin")) {
+				set.status = 403;
+				return {
+					error: true as const,
+					message: "Only moderators can update the queue",
+				};
+			}
+			const [request] = await db
+				.update(actionRequestTable)
+				.set({
+					status: body.status,
+					response: body.response?.trim() || null,
+					resolvedBy:
+						body.status === "resolved" || body.status === "denied"
+							? user.id
+							: null,
+					updatedAt: new Date(),
+				})
+				.where(eq(actionRequestTable.id, actionId))
+				.returning();
+			if (!request) {
+				set.status = 404;
+				return { error: true as const, message: "Action request not found" };
+			}
+			return { error: false as const, request };
+		},
+		{
+			params: t.Object({ gameId: t.String(), actionId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+			body: t.Object({
+				status: ActionRequestStatusSchema,
+				response: t.Optional(t.String()),
+			}),
+		},
+	)
 	// --- Troop endpoints ---
 	.get(
 		"/game/:gameId/country/:countryId/troops",
@@ -1895,6 +2573,34 @@ const app = new Elysia()
 				};
 			}
 
+			const researchStates = await db
+				.select()
+				.from(researchStateTable)
+				.where(eq(researchStateTable.countryStateId, countryId));
+			const researchLevels = new Map(
+				researchStates.map((state) => [state.researchType, state.level]),
+			);
+			if (
+				body.quantities.submarines > 0 &&
+				(researchLevels.get("submarineWarfare") ?? 0) < 1
+			) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: "Submarine Warfare level 1 is required to build submarines",
+				};
+			}
+			if (
+				body.quantities.spies > 0 &&
+				(researchLevels.get("spyEvade") ?? 0) < 1
+			) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: "Spy Evade level 1 is required to recruit spies",
+				};
+			}
+
 			// Compute total resource cost
 			let totalOil = 0;
 			let totalSteel = 0;
@@ -1910,6 +2616,26 @@ const app = new Elysia()
 
 			// Check affordability (US has infinite oil)
 			const isUS = country.name === "United States";
+			const isRussia = country.name === "Russia";
+			const createdAmount = (
+				troopType: (typeof TROOP_TYPES)[number],
+				amount: number,
+			) => {
+				const bonusLevel =
+					troopType === "infantry"
+						? (researchLevels.get("tankWarfare") ?? 0)
+						: troopType === "navalShips"
+							? (researchLevels.get("navalCombat") ?? 0)
+							: troopType === "submarines"
+								? Math.max(0, (researchLevels.get("submarineWarfare") ?? 0) - 1)
+								: troopType === "fighters"
+									? (researchLevels.get("dogfighting") ?? 0)
+									: troopType === "bombers"
+										? (researchLevels.get("bombing") ?? 0)
+										: 0;
+				const withResearch = Math.floor(amount * (1 + bonusLevel * 0.2));
+				return isRussia ? withResearch * 2 : withResearch;
+			};
 			if (!isUS && country.oil < totalOil) {
 				set.status = 400;
 				return { error: true as const, message: "Not enough oil" };
@@ -2015,9 +2741,9 @@ const app = new Elysia()
 						updatedAt: new Date(),
 					};
 					for (const tt of TROOP_TYPES) {
-						if (alloc.troops[tt] > 0) {
-							locUpdate[tt] =
-								sql`${troopLocationTable[tt]} + ${alloc.troops[tt]}`;
+						const amount = createdAmount(tt, alloc.troops[tt]);
+						if (amount > 0) {
+							locUpdate[tt] = sql`${troopLocationTable[tt]} + ${amount}`;
 						}
 					}
 					await db
@@ -2030,13 +2756,16 @@ const app = new Elysia()
 						gameId,
 						name: alloc.location,
 						isHome: alloc.isHome,
-						infantry: alloc.troops.infantry,
-						navalShips: alloc.troops.navalShips,
-						aircraftCarriers: alloc.troops.aircraftCarriers,
-						fighters: alloc.troops.fighters,
-						bombers: alloc.troops.bombers,
-						spies: alloc.troops.spies,
-						submarines: alloc.troops.submarines,
+						infantry: createdAmount("infantry", alloc.troops.infantry),
+						navalShips: createdAmount("navalShips", alloc.troops.navalShips),
+						aircraftCarriers: createdAmount(
+							"aircraftCarriers",
+							alloc.troops.aircraftCarriers,
+						),
+						fighters: createdAmount("fighters", alloc.troops.fighters),
+						bombers: createdAmount("bombers", alloc.troops.bombers),
+						spies: createdAmount("spies", alloc.troops.spies),
+						submarines: createdAmount("submarines", alloc.troops.submarines),
 						createdAt: new Date(),
 						updatedAt: new Date(),
 					});
@@ -2048,13 +2777,16 @@ const app = new Elysia()
 				countryStateId: countryId,
 				gameId,
 				actionType: "purchase",
-				infantry: body.quantities.infantry,
-				navalShips: body.quantities.navalShips,
-				aircraftCarriers: body.quantities.aircraftCarriers,
-				fighters: body.quantities.fighters,
-				bombers: body.quantities.bombers,
-				spies: body.quantities.spies,
-				submarines: body.quantities.submarines,
+				infantry: createdAmount("infantry", body.quantities.infantry),
+				navalShips: createdAmount("navalShips", body.quantities.navalShips),
+				aircraftCarriers: createdAmount(
+					"aircraftCarriers",
+					body.quantities.aircraftCarriers,
+				),
+				fighters: createdAmount("fighters", body.quantities.fighters),
+				bombers: createdAmount("bombers", body.quantities.bombers),
+				spies: createdAmount("spies", body.quantities.spies),
+				submarines: createdAmount("submarines", body.quantities.submarines),
 				details: JSON.stringify(
 					body.allocations.map((a) => ({
 						location: a.location,
@@ -2153,6 +2885,21 @@ const app = new Elysia()
 				.select()
 				.from(troopLocationTable)
 				.where(eq(troopLocationTable.countryStateId, countryId));
+			const currentById = new Map(
+				currentLocations.map((location) => [location.id, location]),
+			);
+			for (const location of body.locations) {
+				if (location.id === undefined) continue;
+				const existing = currentById.get(location.id);
+				if (!existing || existing.name !== location.name) {
+					set.status = 400;
+					return {
+						error: true as const,
+						message:
+							"Existing troop locations cannot be renamed. Create a movement to a new location instead.",
+					};
+				}
+			}
 
 			// Compute current totals per troop type
 			const currentTotals: Record<string, number> = {};
@@ -2374,6 +3121,7 @@ const app = new Elysia()
 			body: t.Object({
 				locations: t.Array(
 					t.Object({
+						id: t.Optional(t.Number()),
 						name: t.String(),
 						isHome: t.Boolean(),
 						troops: TroopCountsSchema,
@@ -2614,18 +3362,42 @@ const app = new Elysia()
 		async ({ params, body, query, set }) => {
 			const gameId = Number.parseInt(params.gameId, 10);
 
-			// Check if user is a mod
 			const [user] = await db
 				.select()
 				.from(usersTable)
 				.where(eq(usersTable.id, query.authorization));
 
-			if (!user || user.country !== "Mods") {
-				set.status = 403;
+			if (!user || !user.country) {
+				set.status = 401;
 				return {
 					error: true as const,
-					message: "Only moderators can create announcements",
+					message: "You must be assigned to a country",
 				};
+			}
+			const currentYear = await yearScheduler.getCurrentYear(gameId);
+			const isMod = user.country === "Mods";
+			if (!isMod) {
+				const existingCountryAnnouncements = await db
+					.select({ id: announcementsTable.id })
+					.from(announcementsTable)
+					.where(
+						and(
+							eq(announcementsTable.gameId, gameId),
+							eq(
+								announcementsTable.authorCountry,
+								user.country as PlayableCountry,
+							),
+							eq(announcementsTable.kind, "country"),
+							eq(announcementsTable.year, currentYear),
+						),
+					);
+				if (existingCountryAnnouncements.length >= 3) {
+					set.status = 429;
+					return {
+						error: true as const,
+						message: "Countries may publish three announcements per year",
+					};
+				}
 			}
 
 			// Create the announcement
@@ -2634,7 +3406,10 @@ const app = new Elysia()
 				.values({
 					gameId,
 					content: body.content,
-					targetCountries: body.targetCountries ?? null,
+					kind: isMod ? "psa" : "country",
+					authorCountry: isMod ? null : (user.country as PlayableCountry),
+					year: currentYear,
+					targetCountries: isMod ? (body.targetCountries ?? null) : null,
 					createdBy: user.id,
 					createdAt: new Date(),
 				})
@@ -2644,6 +3419,9 @@ const app = new Elysia()
 				id: announcement.id,
 				gameId: announcement.gameId,
 				content: announcement.content,
+				kind: announcement.kind,
+				authorCountry: announcement.authorCountry,
+				year: announcement.year,
 				targetCountries: announcement.targetCountries as
 					| PlayableCountry[]
 					| null,
@@ -2657,7 +3435,7 @@ const app = new Elysia()
 				announcement: announcementData,
 			});
 
-			if (body.targetCountries && body.targetCountries.length > 0) {
+			if (isMod && body.targetCountries && body.targetCountries.length > 0) {
 				// Send to specific country rooms
 				for (const country of body.targetCountries) {
 					app.server?.publish(`country:${country}`, wsMessage);
@@ -2691,7 +3469,8 @@ const app = new Elysia()
 			]),
 			detail: {
 				summary: "Create Announcement",
-				description: "Creates a new announcement (mod only).",
+				description:
+					"Creates a moderator PSA or a country announcement (three per country per year).",
 				tags: ["Announcements"],
 			},
 		},
@@ -2713,26 +3492,45 @@ const app = new Elysia()
 				};
 			}
 
-			const [announcement] = await db
-				.insert(announcementsTable)
+			const [country] = await db
+				.select()
+				.from(countryStateTable)
+				.where(
+					and(
+						eq(countryStateTable.gameId, gameId),
+						eq(countryStateTable.name, user.country),
+					),
+				);
+			if (!country) {
+				set.status = 404;
+				return { error: true as const, message: "Country state not found" };
+			}
+
+			const [request] = await db
+				.insert(actionRequestTable)
 				.values({
 					gameId,
-					content: `[MOD REQUEST] ${user.country}`,
-					targetCountries: [],
+					countryStateId: country.id,
+					type: "general",
+					title: "Moderator requested",
+					description: `${user.country} requested a moderator at their table.`,
+					status: "pending",
 					createdBy: user.id,
 					createdAt: new Date(),
+					updatedAt: new Date(),
 				})
 				.returning();
 
 			const announcementData = {
-				id: announcement.id,
-				gameId: announcement.gameId,
-				content: announcement.content,
-				targetCountries: announcement.targetCountries as
-					| PlayableCountry[]
-					| null,
+				id: request.id,
+				gameId: request.gameId,
+				content: `[MOD REQUEST] ${user.country}`,
+				kind: "country" as const,
+				authorCountry: user.country as PlayableCountry,
+				year: await yearScheduler.getCurrentYear(gameId),
+				targetCountries: [] as PlayableCountry[],
 				createdBy: user.name,
-				createdAt: announcement.createdAt,
+				createdAt: request.createdAt,
 			};
 
 			app.server?.publish(
@@ -2786,6 +3584,9 @@ const app = new Elysia()
 					id: announcementsTable.id,
 					gameId: announcementsTable.gameId,
 					content: announcementsTable.content,
+					kind: announcementsTable.kind,
+					authorCountry: announcementsTable.authorCountry,
+					year: announcementsTable.year,
 					targetCountries: announcementsTable.targetCountries,
 					createdBy: usersTable.name,
 					createdAt: announcementsTable.createdAt,
@@ -2809,6 +3610,9 @@ const app = new Elysia()
 					id: a.id,
 					gameId: a.gameId,
 					content: a.content,
+					kind: a.kind,
+					authorCountry: a.authorCountry,
+					year: a.year,
 					targetCountries: a.targetCountries as PlayableCountry[] | null,
 					createdBy: a.createdBy ?? "Unknown",
 					createdAt: a.createdAt,
@@ -2831,6 +3635,136 @@ const app = new Elysia()
 				description: "Returns announcements visible to the user.",
 				tags: ["Announcements"],
 			},
+		},
+	)
+	.get(
+		"/game/:gameId/announcement-replies",
+		async ({ params, query, set }) => {
+			const gameId = Number.parseInt(params.gameId, 10);
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			if (!user) {
+				set.status = 401;
+				return { error: true as const, message: "Unauthorized" };
+			}
+			const rows = await db
+				.select({
+					id: announcementRepliesTable.id,
+					announcementId: announcementRepliesTable.announcementId,
+					gameId: announcementRepliesTable.gameId,
+					content: announcementRepliesTable.content,
+					createdBy: usersTable.name,
+					authorCountry: announcementRepliesTable.authorCountry,
+					createdAt: announcementRepliesTable.createdAt,
+					targetCountries: announcementsTable.targetCountries,
+				})
+				.from(announcementRepliesTable)
+				.innerJoin(
+					announcementsTable,
+					eq(announcementRepliesTable.announcementId, announcementsTable.id),
+				)
+				.leftJoin(
+					usersTable,
+					eq(announcementRepliesTable.createdBy, usersTable.id),
+				)
+				.where(eq(announcementRepliesTable.gameId, gameId))
+				.orderBy(announcementRepliesTable.createdAt);
+
+			const replies = rows
+				.filter((row) => {
+					if (user.country === "Mods") return true;
+					if (!row.targetCountries) return true;
+					return row.targetCountries.includes(user.country as PlayableCountry);
+				})
+				.map(({ targetCountries: _targetCountries, ...reply }) => ({
+					...reply,
+					createdBy: reply.createdBy ?? "Unknown",
+					authorCountry: reply.authorCountry as Country,
+				}));
+			return { error: false as const, replies };
+		},
+		{
+			params: t.Object({ gameId: t.String() }),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					replies: t.Array(AnnouncementReplySchema),
+				}),
+				ErrorSchema,
+			]),
+		},
+	)
+	.post(
+		"/game/:gameId/announcements/:announcementId/replies",
+		async ({ params, query, body, set }) => {
+			const gameId = Number.parseInt(params.gameId, 10);
+			const announcementId = Number.parseInt(params.announcementId, 10);
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			if (!user?.country) {
+				set.status = 401;
+				return { error: true as const, message: "Unauthorized" };
+			}
+			const [announcement] = await db
+				.select()
+				.from(announcementsTable)
+				.where(
+					and(
+						eq(announcementsTable.id, announcementId),
+						eq(announcementsTable.gameId, gameId),
+					),
+				);
+			if (!announcement) {
+				set.status = 404;
+				return { error: true as const, message: "Announcement not found" };
+			}
+			const targets = announcement.targetCountries as PlayableCountry[] | null;
+			if (
+				user.country !== "Mods" &&
+				targets &&
+				!targets.includes(user.country as PlayableCountry)
+			) {
+				set.status = 403;
+				return { error: true as const, message: "Announcement is not visible" };
+			}
+			const content = body.content.trim();
+			if (!content || content.length > 1000) {
+				set.status = 400;
+				return {
+					error: true as const,
+					message: "Replies must be between 1 and 1,000 characters",
+				};
+			}
+			const [reply] = await db
+				.insert(announcementRepliesTable)
+				.values({
+					announcementId,
+					gameId,
+					content,
+					createdBy: user.id,
+					authorCountry: user.country,
+					createdAt: new Date(),
+				})
+				.returning();
+			return {
+				error: false as const,
+				reply: { ...reply, createdBy: user.name, authorCountry: user.country },
+			};
+		},
+		{
+			params: t.Object({ gameId: t.String(), announcementId: t.String() }),
+			body: t.Object({ content: t.String() }),
+			response: t.Union([
+				t.Object({
+					error: t.Literal(false),
+					reply: AnnouncementReplySchema,
+				}),
+				ErrorSchema,
+			]),
 		},
 	)
 	.delete(

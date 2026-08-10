@@ -3,6 +3,7 @@ import type { App } from "..";
 import { db } from "../db";
 import { gameStateTable, gamesTable, yearSchedulesTable } from "../db/schema";
 import type { YearDurations } from "../schema";
+import { processAnnualProduction } from "./annual-production";
 
 const GAME_YEARS = [1938, 1939, 1940, 1941, 1942, 1943, 1944] as const;
 
@@ -296,7 +297,9 @@ class YearScheduler {
 			.where(eq(gameStateTable.gameId, gameId));
 		if (gameState.currentYear >= newYear) return;
 
-		// Update game state with new year
+		const updatedCountries = await processAnnualProduction(gameId, newYear);
+
+		// Update game state with new year after annual production succeeds
 		await db
 			.update(gameStateTable)
 			.set({
@@ -313,6 +316,16 @@ class YearScheduler {
 				year: newYear,
 			}),
 		);
+
+		for (const country of updatedCountries) {
+			const message = JSON.stringify({
+				type: "server.country.resources",
+				country: country.name,
+				resources: country.resources,
+			});
+			this.app?.server?.publish(`country:${country.name}`, message);
+			this.app?.server?.publish("country:Mods", message);
+		}
 	}
 
 	/**

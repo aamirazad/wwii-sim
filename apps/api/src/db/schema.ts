@@ -98,6 +98,12 @@ export const countryStateTable = t.sqliteTable("country_state", {
 	oil: t.int("oil").default(0).notNull(),
 	steel: t.int("steel").default(0).notNull(),
 	population: t.int("population").default(0).notNull(),
+	oilLevel: t.int("oil_level").default(5).notNull(),
+	steelLevel: t.int("steel_level").default(5).notNull(),
+	populationLevel: t.int("population_level").default(5).notNull(),
+	morale: t.int("morale").default(50).notNull(),
+	tokens: t.int("tokens").default(0).notNull(),
+	lastProcessedYear: t.int("last_processed_year").default(1938).notNull(),
 	createdAt: t
 		.integer("created_at", { mode: "timestamp" })
 		.default(sql`(strftime('%s','now'))`)
@@ -149,6 +155,9 @@ export const announcementsTable = t.sqliteTable("announcements", {
 		.references(() => gamesTable.id, { onDelete: "cascade" }),
 	// The announcement content (supports basic markdown)
 	content: t.text("content").notNull(),
+	kind: t.text("kind").$type<"psa" | "country">().notNull().default("psa"),
+	authorCountry: t.text("author_country").$type<PlayableCountry>(),
+	year: t.int("year").notNull().default(1938),
 	// Target countries as JSON array, null means all countries
 	targetCountries: t
 		.text("target_countries", { mode: "json" })
@@ -158,6 +167,28 @@ export const announcementsTable = t.sqliteTable("announcements", {
 		.text("created_by")
 		.notNull()
 		.references(() => usersTable.id, { onDelete: "cascade" }),
+	createdAt: t
+		.integer("created_at", { mode: "timestamp" })
+		.default(sql`(strftime('%s','now'))`)
+		.notNull(),
+});
+
+export const announcementRepliesTable = t.sqliteTable("announcement_replies", {
+	id: t.int().primaryKey({ autoIncrement: true }),
+	announcementId: t
+		.int("announcement_id")
+		.notNull()
+		.references(() => announcementsTable.id, { onDelete: "cascade" }),
+	gameId: t
+		.int("game_id")
+		.notNull()
+		.references(() => gamesTable.id, { onDelete: "cascade" }),
+	content: t.text("content").notNull(),
+	createdBy: t
+		.text("created_by")
+		.notNull()
+		.references(() => usersTable.id, { onDelete: "cascade" }),
+	authorCountry: t.text("author_country").$type<Country>().notNull(),
 	createdAt: t
 		.integer("created_at", { mode: "timestamp" })
 		.default(sql`(strftime('%s','now'))`)
@@ -277,6 +308,8 @@ export const tradeRequestTable = t.sqliteTable("trade_request", {
 	initiatorSteel: t.int("initiator_steel").notNull().default(0),
 	recipientOil: t.int("recipient_oil").notNull().default(0),
 	recipientSteel: t.int("recipient_steel").notNull().default(0),
+	initiatorPopulation: t.int("initiator_population").notNull().default(0),
+	recipientPopulation: t.int("recipient_population").notNull().default(0),
 	status: t
 		.text("status")
 		.$type<"pending" | "accepted" | "rejected">()
@@ -286,6 +319,100 @@ export const tradeRequestTable = t.sqliteTable("trade_request", {
 		.text("created_by")
 		.notNull()
 		.references(() => usersTable.id, { onDelete: "cascade" }),
+	createdAt: t
+		.integer("created_at", { mode: "timestamp" })
+		.default(sql`(strftime('%s','now'))`)
+		.notNull(),
+	updatedAt: t
+		.integer("updated_at", { mode: "timestamp" })
+		.default(sql`(strftime('%s','now'))`)
+		.notNull(),
+});
+
+export const researchStateTable = t.sqliteTable("research_state", {
+	id: t.int().primaryKey({ autoIncrement: true }),
+	gameId: t
+		.int("game_id")
+		.notNull()
+		.references(() => gamesTable.id, { onDelete: "cascade" }),
+	countryStateId: t
+		.int("country_state_id")
+		.notNull()
+		.references(() => countryStateTable.id, { onDelete: "cascade" }),
+	researchType: t.text("research_type").notNull(),
+	level: t.int("level").notNull().default(0),
+	startingLevel: t.int("starting_level").notNull().default(0),
+	updatedAt: t
+		.integer("updated_at", { mode: "timestamp" })
+		.default(sql`(strftime('%s','now'))`)
+		.notNull(),
+});
+
+export const researchRequestTable = t.sqliteTable("research_request", {
+	id: t.int().primaryKey({ autoIncrement: true }),
+	gameId: t
+		.int("game_id")
+		.notNull()
+		.references(() => gamesTable.id, { onDelete: "cascade" }),
+	countryStateId: t
+		.int("country_state_id")
+		.notNull()
+		.references(() => countryStateTable.id, { onDelete: "cascade" }),
+	researchType: t.text("research_type").notNull(),
+	targetLevel: t.int("target_level").notNull(),
+	steelCost: t.int("steel_cost").notNull().default(0),
+	populationCost: t.int("population_cost").notNull().default(0),
+	status: t
+		.text("status")
+		.$type<"pending" | "succeeded" | "failed" | "cancelled">()
+		.notNull()
+		.default("pending"),
+	plan: t.text("plan"),
+	moderatorNote: t.text("moderator_note"),
+	createdBy: t
+		.text("created_by")
+		.notNull()
+		.references(() => usersTable.id, { onDelete: "cascade" }),
+	resolvedBy: t.text("resolved_by").references(() => usersTable.id, {
+		onDelete: "set null",
+	}),
+	createdAt: t
+		.integer("created_at", { mode: "timestamp" })
+		.default(sql`(strftime('%s','now'))`)
+		.notNull(),
+	resolvedAt: t.integer("resolved_at", { mode: "timestamp" }),
+});
+
+export const actionRequestTable = t.sqliteTable("action_request", {
+	id: t.int().primaryKey({ autoIncrement: true }),
+	gameId: t
+		.int("game_id")
+		.notNull()
+		.references(() => gamesTable.id, { onDelete: "cascade" }),
+	countryStateId: t
+		.int("country_state_id")
+		.notNull()
+		.references(() => countryStateTable.id, { onDelete: "cascade" }),
+	type: t
+		.text("type")
+		.$type<"battle" | "movement" | "spy" | "conference" | "general">()
+		.notNull(),
+	title: t.text("title").notNull(),
+	description: t.text("description").notNull(),
+	payload: t.text("payload", { mode: "json" }).$type<Record<string, unknown>>(),
+	status: t
+		.text("status")
+		.$type<"pending" | "in_progress" | "approved" | "denied" | "resolved">()
+		.notNull()
+		.default("pending"),
+	response: t.text("response"),
+	createdBy: t
+		.text("created_by")
+		.notNull()
+		.references(() => usersTable.id, { onDelete: "cascade" }),
+	resolvedBy: t.text("resolved_by").references(() => usersTable.id, {
+		onDelete: "set null",
+	}),
 	createdAt: t
 		.integer("created_at", { mode: "timestamp" })
 		.default(sql`(strftime('%s','now'))`)
@@ -325,9 +452,13 @@ export const table = {
 	countryStateTable,
 	resourceChangeLogTable,
 	announcementsTable,
+	announcementRepliesTable,
 	troopLocationTable,
 	troopChangeLogTable,
 	tradeRequestTable,
+	researchStateTable,
+	researchRequestTable,
+	actionRequestTable,
 	yearSchedulesTable,
 } as const;
 

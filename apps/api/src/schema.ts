@@ -248,7 +248,7 @@ export const DEFAULT_COUNTRY_STARTING_RESOURCES: Record<
 	Italy: { oil: 50, steel: 60, population: 65 },
 	Japan: { oil: 80, steel: 100, population: 100 },
 	Russia: { oil: 100, steel: 2, population: 30 },
-	"United Kingdom": { oil: 1, steel: 2, population: 3 },
+	"United Kingdom": { oil: 0, steel: 30, population: 30 },
 	"United States": { oil: 999999, steel: 0, population: 0 },
 };
 
@@ -276,6 +276,12 @@ export const CountryStateSchema = t.Object({
 	oil: t.Number(),
 	steel: t.Number(),
 	population: t.Number(),
+	oilLevel: t.Number(),
+	steelLevel: t.Number(),
+	populationLevel: t.Number(),
+	morale: t.Number(),
+	tokens: t.Number(),
+	lastProcessedYear: t.Number(),
 	createdAt: t.Date(),
 	updatedAt: t.Date(),
 });
@@ -299,6 +305,7 @@ export type ResourceChangeLog = Static<typeof ResourceChangeLogSchema>;
 export const TradeResourcesSchema = t.Object({
 	oil: t.Number(),
 	steel: t.Number(),
+	population: t.Number(),
 });
 
 export type TradeResources = Static<typeof TradeResourcesSchema>;
@@ -333,12 +340,110 @@ export const AnnouncementSchema = t.Object({
 	id: t.Number(),
 	gameId: t.Number(),
 	content: t.String(),
+	kind: t.Union([t.Literal("psa"), t.Literal("country")]),
+	authorCountry: t.Nullable(PlayableCountrySchema),
+	year: t.Number(),
 	targetCountries: t.Nullable(t.Array(PlayableCountrySchema)),
 	createdBy: t.String(),
 	createdAt: t.Date(),
 });
 
 export type Announcement = Static<typeof AnnouncementSchema>;
+
+export const AnnouncementReplySchema = t.Object({
+	id: t.Number(),
+	announcementId: t.Number(),
+	gameId: t.Number(),
+	content: t.String(),
+	createdBy: t.String(),
+	authorCountry: CountrySchema,
+	createdAt: t.Date(),
+});
+
+export type AnnouncementReply = Static<typeof AnnouncementReplySchema>;
+
+export const ResearchTypeSchema = t.Union([
+	t.Literal("tankWarfare"),
+	t.Literal("efficientMovement"),
+	t.Literal("improvedWeaponry"),
+	t.Literal("navalCombat"),
+	t.Literal("coastalDefense"),
+	t.Literal("submarineWarfare"),
+	t.Literal("bombing"),
+	t.Literal("antiAircraft"),
+	t.Literal("improvedPlaneWeaponry"),
+	t.Literal("dogfighting"),
+	t.Literal("spyEvade"),
+	t.Literal("spyEndure"),
+	t.Literal("spyInfiltrate"),
+	t.Literal("nuclearResearch"),
+]);
+
+export const ResearchStateSchema = t.Object({
+	id: t.Number(),
+	gameId: t.Number(),
+	countryStateId: t.Number(),
+	researchType: ResearchTypeSchema,
+	level: t.Number(),
+	startingLevel: t.Number(),
+	updatedAt: t.Date(),
+});
+
+export const ResearchRequestSchema = t.Object({
+	id: t.Number(),
+	gameId: t.Number(),
+	countryStateId: t.Number(),
+	countryName: PlayableCountrySchema,
+	researchType: ResearchTypeSchema,
+	targetLevel: t.Number(),
+	steelCost: t.Number(),
+	populationCost: t.Number(),
+	status: t.Union([
+		t.Literal("pending"),
+		t.Literal("succeeded"),
+		t.Literal("failed"),
+		t.Literal("cancelled"),
+	]),
+	plan: t.Nullable(t.String()),
+	moderatorNote: t.Nullable(t.String()),
+	createdBy: t.String(),
+	resolvedBy: t.Nullable(t.String()),
+	createdAt: t.Date(),
+	resolvedAt: t.Nullable(t.Date()),
+});
+
+export const ActionRequestTypeSchema = t.Union([
+	t.Literal("battle"),
+	t.Literal("movement"),
+	t.Literal("spy"),
+	t.Literal("conference"),
+	t.Literal("general"),
+]);
+
+export const ActionRequestStatusSchema = t.Union([
+	t.Literal("pending"),
+	t.Literal("in_progress"),
+	t.Literal("approved"),
+	t.Literal("denied"),
+	t.Literal("resolved"),
+]);
+
+export const ActionRequestSchema = t.Object({
+	id: t.Number(),
+	gameId: t.Number(),
+	countryStateId: t.Number(),
+	countryName: PlayableCountrySchema,
+	type: ActionRequestTypeSchema,
+	title: t.String(),
+	description: t.String(),
+	payload: t.Nullable(t.Record(t.String(), t.Unknown())),
+	status: ActionRequestStatusSchema,
+	response: t.Nullable(t.String()),
+	createdBy: t.String(),
+	resolvedBy: t.Nullable(t.String()),
+	createdAt: t.Date(),
+	updatedAt: t.Date(),
+});
 
 export const ErrorSchema = t.Object({
 	error: t.Literal(true),
