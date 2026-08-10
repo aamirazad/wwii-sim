@@ -57,6 +57,13 @@
 			"when": 1786334679545,
 			"tag": "0007_gray_nuke",
 			"breakpoints": true
+		},
+		{
+			"idx": 8,
+			"version": "6",
+			"when": 1786336755381,
+			"tag": "0008_crazy_tag",
+			"breakpoints": true
 		}
 	]
 }

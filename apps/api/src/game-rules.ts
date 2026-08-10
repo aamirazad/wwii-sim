@@ -908,9 +908,22 @@ export function productionFor(
 }
 
 export function moraleAnnualEffect(morale: number) {
-	if (morale <= 20) return { levelDelta: -1, resourceDelta: 0 };
-	if (morale <= 40) return { levelDelta: 0, resourceDelta: -5 };
-	if (morale <= 60) return { levelDelta: 0, resourceDelta: 0 };
-	if (morale <= 80) return { levelDelta: 0, resourceDelta: 5 };
-	return { levelDelta: 1, resourceDelta: 0 };
+	const noResources = { oil: 0, steel: 0, population: 0 };
+	if (morale <= 50) return { levelDelta: 0, resourceDelta: noResources };
+	if (morale <= 70)
+		return {
+			levelDelta: 0,
+			resourceDelta: { oil: 1, steel: 1, population: 5 },
+		};
+	if (morale <= 80)
+		return {
+			levelDelta: 0,
+			resourceDelta: { oil: 2, steel: 2, population: 5 },
+		};
+	if (morale <= 90)
+		return {
+			levelDelta: 0,
+			resourceDelta: { oil: 3, steel: 3, population: 6 },
+		};
+	return { levelDelta: 1, resourceDelta: noResources };
 }

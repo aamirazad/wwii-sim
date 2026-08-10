@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { cors } from "@elysiajs/cors";
 import { fromTypes, openapi } from "@elysiajs/openapi";
 import { and, eq, or, sql } from "drizzle-orm";
@@ -551,6 +552,8 @@ const app = new Elysia()
 						populationLevel: 5,
 						morale: countryRules.startingMorale,
 						tokens: countryRules.startingTokens,
+						scrapDrivesUsed: 0,
+						lastScrapDriveYear: null,
 						lastProcessedYear: 1938,
 						createdAt: new Date(),
 						updatedAt: new Date(),
@@ -615,6 +618,8 @@ const app = new Elysia()
 					populationLevel: countryState.populationLevel,
 					morale: countryState.morale,
 					tokens: countryState.tokens,
+					scrapDrivesUsed: countryState.scrapDrivesUsed,
+					lastScrapDriveYear: countryState.lastScrapDriveYear,
 					lastProcessedYear: countryState.lastProcessedYear,
 					createdAt: countryState.createdAt,
 					updatedAt: countryState.updatedAt,
@@ -681,6 +686,8 @@ const app = new Elysia()
 					populationLevel: c.populationLevel,
 					morale: c.morale,
 					tokens: c.tokens,
+					scrapDrivesUsed: c.scrapDrivesUsed,
+					lastScrapDriveYear: c.lastScrapDriveYear,
 					lastProcessedYear: c.lastProcessedYear,
 					createdAt: c.createdAt,
 					updatedAt: c.updatedAt,
@@ -744,6 +751,8 @@ const app = new Elysia()
 					populationLevel: country.populationLevel,
 					morale: country.morale,
 					tokens: country.tokens,
+					scrapDrivesUsed: country.scrapDrivesUsed,
+					lastScrapDriveYear: country.lastScrapDriveYear,
 					lastProcessedYear: country.lastProcessedYear,
 					createdAt: country.createdAt,
 					updatedAt: country.updatedAt,
@@ -1300,6 +1309,8 @@ const app = new Elysia()
 					populationLevel: updatedCountry.populationLevel,
 					morale: updatedCountry.morale,
 					tokens: updatedCountry.tokens,
+					scrapDrivesUsed: updatedCountry.scrapDrivesUsed,
+					lastScrapDriveYear: updatedCountry.lastScrapDriveYear,
 					lastProcessedYear: updatedCountry.lastProcessedYear,
 					createdAt: updatedCountry.createdAt,
 					updatedAt: updatedCountry.updatedAt,
@@ -1993,6 +2004,89 @@ const app = new Elysia()
 			}),
 		},
 	)
+	.post(
+		"/game/:gameId/country/:countryId/scrap-drive",
+		async ({ params, query, set }) => {
+			const gameId = Number.parseInt(params.gameId, 10);
+			const countryId = Number.parseInt(params.countryId, 10);
+			const [user] = await db
+				.select()
+				.from(usersTable)
+				.where(eq(usersTable.id, query.authorization));
+			const [currentGameState] = await db
+				.select()
+				.from(gameStateTable)
+				.where(eq(gameStateTable.gameId, gameId));
+			if (!user || !currentGameState) {
+				set.status = 404;
+				return { error: true as const, message: "Game or player not found" };
+			}
+
+			const result = await db.transaction(async (tx) => {
+				const [country] = await tx
+					.select()
+					.from(countryStateTable)
+					.where(
+						and(
+							eq(countryStateTable.id, countryId),
+							eq(countryStateTable.gameId, gameId),
+						),
+					);
+				if (
+					!country ||
+					(user.country !== country.name && user.country !== "Mods")
+				)
+					return { error: "Unauthorized" } as const;
+				if (country.scrapDrivesUsed >= 3)
+					return {
+						error: "This country has already used all three scrap metal drives",
+					} as const;
+				if (country.lastScrapDriveYear === currentGameState.currentYear)
+					return {
+						error: "A country may run only one scrap metal drive each year",
+					} as const;
+
+				const diceCount = [4, 2, 1][country.scrapDrivesUsed];
+				const rolls = Array.from({ length: diceCount }, () => randomInt(1, 7));
+				const steelGained = rolls.reduce((total, roll) => total + roll, 0);
+				const [updatedCountry] = await tx
+					.update(countryStateTable)
+					.set({
+						steel: country.steel + steelGained,
+						scrapDrivesUsed: country.scrapDrivesUsed + 1,
+						lastScrapDriveYear: currentGameState.currentYear,
+						updatedAt: new Date(),
+					})
+					.where(eq(countryStateTable.id, country.id))
+					.returning();
+				await tx.insert(resourceChangeLogTable).values({
+					countryStateId: country.id,
+					gameId,
+					resourceType: "steel",
+					previousValue: country.steel,
+					newValue: updatedCountry.steel,
+					note: `${currentGameState.currentYear} scrap metal drive (${rolls.join(" + ")})`,
+					changedBy: user.name,
+					createdAt: new Date(),
+				});
+				return { error: null, rolls, steelGained, country: updatedCountry };
+			});
+			if (result.error) {
+				set.status = result.error === "Unauthorized" ? 403 : 400;
+				return { error: true as const, message: result.error };
+			}
+			return {
+				error: false as const,
+				rolls: result.rolls,
+				steelGained: result.steelGained,
+				country: result.country,
+			};
+		},
+		{
+			params: t.Object({ gameId: t.String(), countryId: t.String() }),
+			query: t.Object({ authorization: t.String() }),
+		},
+	)
 	.get(
 		"/game/:gameId/country/:countryId/research",
 		async ({ params, query, set }) => {
@@ -2292,7 +2386,13 @@ const app = new Elysia()
 						user?.role === "admin" ||
 						user?.country === countryName;
 					const payload = request.payload ? { ...request.payload } : null;
-					if (payload && !canSeePrivate) delete payload.plan;
+					if (payload && !canSeePrivate) {
+						delete payload.plan;
+						delete payload.troops;
+						delete payload.sourceLocationId;
+						delete payload.sourceLocationName;
+						delete payload.highLow;
+					}
 					return {
 						...request,
 						payload,
@@ -2328,6 +2428,7 @@ const app = new Elysia()
 				set.status = 403;
 				return { error: true as const, message: "Unauthorized" };
 			}
+			let sourceLocationName: string | undefined;
 			if (body.type === "battle") {
 				if (
 					!body.sourceLocationId ||
@@ -2356,6 +2457,7 @@ const app = new Elysia()
 					set.status = 404;
 					return { error: true as const, message: "Source location not found" };
 				}
+				sourceLocationName = location.name;
 				let total = 0;
 				for (const troopType of TROOP_TYPES) {
 					const amount = body.troops[troopType];
@@ -2378,6 +2480,7 @@ const app = new Elysia()
 			}
 			const payload = {
 				sourceLocationId: body.sourceLocationId,
+				sourceLocationName,
 				targetLocation: body.targetLocation,
 				targetCountry: body.targetCountry,
 				highLow: body.highLow,

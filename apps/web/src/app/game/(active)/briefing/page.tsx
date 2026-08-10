@@ -1,11 +1,13 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { Flag, Gauge, ScrollText } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Dices, Flag, Gauge, ScrollText } from "lucide-react";
 import { useMemo, useState } from "react";
 import CountryDashboard from "@/components/country-dashboard";
 import LoadingSpinner from "@/components/loading-spinner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
 	Select,
@@ -27,9 +29,15 @@ const titleCase = (value: string) =>
 export default function BriefingPage() {
 	const { gameState, userState } = useGame();
 	const userId = getUserId();
+	const queryClient = useQueryClient();
 	const [selectedCountryId, setSelectedCountryId] = useState<number | null>(
 		null,
 	);
+	const [stats, setStats] = useState<Record<string, string>>({});
+	const [savingStats, setSavingStats] = useState(false);
+	const [statsMessage, setStatsMessage] = useState<string | null>(null);
+	const [scrapResult, setScrapResult] = useState<string | null>(null);
+	const [rollingScrap, setRollingScrap] = useState(false);
 	useGamePageGuard({ requires: "active-game", gameState, userState });
 
 	const gameId = gameState.status === "has-game" ? gameState.game.id : null;
@@ -93,6 +101,61 @@ export default function BriefingPage() {
 		steel: country.steelLevel,
 		population: country.populationLevel,
 	};
+	const statValue = (name: string, fallback: number) =>
+		stats[name] ?? String(fallback);
+	const saveStats = async () => {
+		if (!userId || !gameId) return;
+		setSavingStats(true);
+		setStatsMessage(null);
+		const response = await api
+			.game({ gameId: String(gameId) })
+			.country({ countryId: String(country.id) })
+			.stats.patch(
+				{
+					morale: Number(statValue("morale", country.morale)),
+					tokens: Number(statValue("tokens", country.tokens)),
+					oilLevel: Number(statValue("oilLevel", country.oilLevel)),
+					steelLevel: Number(statValue("steelLevel", country.steelLevel)),
+					populationLevel: Number(
+						statValue("populationLevel", country.populationLevel),
+					),
+				},
+				{ query: { authorization: userId } },
+			);
+		setSavingStats(false);
+		if (response.error) {
+			setStatsMessage(response.error.value.message ?? "Could not save stats");
+			return;
+		}
+		setStats({});
+		setStatsMessage("National stats updated.");
+		await queryClient.invalidateQueries({ queryKey: ["countries", gameId] });
+	};
+	const runScrapDrive = async () => {
+		if (!userId || !gameId) return;
+		setRollingScrap(true);
+		setScrapResult(null);
+		const response = await api
+			.game({ gameId: String(gameId) })
+			.country({ countryId: String(country.id) })
+			["scrap-drive"].post({}, { query: { authorization: userId } });
+		setRollingScrap(false);
+		if (
+			response.error ||
+			!response.data ||
+			response.data.error !== false ||
+			!("rolls" in response.data)
+		) {
+			setScrapResult(
+				response.error?.value.message ?? "Could not run scrap metal drive",
+			);
+			return;
+		}
+		setScrapResult(
+			`Rolled ${response.data.rolls.join(" + ")} and gained ${response.data.steelGained} steel.`,
+		);
+		await queryClient.invalidateQueries({ queryKey: ["countries", gameId] });
+	};
 
 	return (
 		<CountryDashboard tab="Briefing">
@@ -113,7 +176,11 @@ export default function BriefingPage() {
 							<Label>Inspect country</Label>
 							<Select
 								value={String(country.id)}
-								onValueChange={(value) => setSelectedCountryId(Number(value))}
+								onValueChange={(value) => {
+									setSelectedCountryId(Number(value));
+									setStats({});
+									setStatsMessage(null);
+								}}
 							>
 								<SelectTrigger>
 									<SelectValue />
@@ -146,13 +213,21 @@ export default function BriefingPage() {
 							[
 								"Morale",
 								country.morale,
-								country.morale === 0
-									? "Defeated"
-									: country.morale < 20
-										? "−25% production"
-										: country.morale < 40
-											? "−10% production"
-											: "Stable",
+								country.morale <= 10
+									? "Overthrow risk"
+									: country.morale <= 20
+										? "Widespread riots"
+										: country.morale <= 30
+											? "Peaceful protests"
+											: country.morale <= 50
+												? "No annual bonus"
+												: country.morale <= 70
+													? "+1 oil/steel, +5 population"
+													: country.morale <= 80
+														? "+2 oil/steel, +5 population"
+														: country.morale <= 90
+															? "+3 oil/steel, +6 population"
+															: "+1 extra level",
 							],
 							["Tokens", country.tokens, "Available"],
 							[
@@ -175,6 +250,82 @@ export default function BriefingPage() {
 						{rules.tokenEffect}
 					</div>
 				</section>
+
+				<section className="border p-4">
+					<h3 className="flex items-center gap-2 font-serif text-xl font-semibold">
+						<Dices className="size-5 text-primary" /> Scrap metal drive
+					</h3>
+					<p className="mt-2 text-sm leading-6 text-muted-foreground">
+						Used {country.scrapDrivesUsed} of 3. The first drive rolls 4d6, the
+						second 2d6, and the third 1d6. Only one may be held each year.
+					</p>
+					<div className="mt-4 flex flex-wrap items-center gap-3">
+						<Button
+							onClick={runScrapDrive}
+							disabled={
+								rollingScrap ||
+								country.scrapDrivesUsed >= 3 ||
+								country.lastScrapDriveYear === gameState.game.currentYear
+							}
+						>
+							<Dices /> {rollingScrap ? "Rolling…" : "Run this year's drive"}
+						</Button>
+						{country.lastScrapDriveYear === gameState.game.currentYear && (
+							<p className="text-sm text-muted-foreground">
+								Already used in {gameState.game.currentYear}.
+							</p>
+						)}
+						{scrapResult && <p className="text-sm">{scrapResult}</p>}
+					</div>
+				</section>
+
+				{isMod && (
+					<section className="border p-4">
+						<h3 className="font-serif text-xl font-semibold">
+							Moderator national controls
+						</h3>
+						<p className="mt-1 text-sm text-muted-foreground">
+							Apply objective rewards, penalties, morale changes, and spent
+							tokens here. Levels are limited to 1–20 and morale to 0–100.
+						</p>
+						<div className="mt-4 grid gap-3 sm:grid-cols-5">
+							{[
+								["oilLevel", "Oil level", country.oilLevel],
+								["steelLevel", "Steel level", country.steelLevel],
+								[
+									"populationLevel",
+									"Population level",
+									country.populationLevel,
+								],
+								["morale", "Morale", country.morale],
+								["tokens", "Tokens", country.tokens],
+							].map(([name, label, fallback]) => (
+								<div key={name} className="space-y-1.5">
+									<Label htmlFor={`stat-${name}`}>{label}</Label>
+									<Input
+										id={`stat-${name}`}
+										type="number"
+										value={statValue(String(name), Number(fallback))}
+										onChange={(event) =>
+											setStats((current) => ({
+												...current,
+												[String(name)]: event.target.value,
+											}))
+										}
+									/>
+								</div>
+							))}
+						</div>
+						<div className="mt-4 flex items-center gap-3">
+							<Button onClick={saveStats} disabled={savingStats}>
+								{savingStats ? "Saving…" : "Save national stats"}
+							</Button>
+							{statsMessage && (
+								<p className="text-sm text-muted-foreground">{statsMessage}</p>
+							)}
+						</div>
+					</section>
+				)}
 
 				<section>
 					<h3 className="flex items-center gap-2 font-serif text-xl font-semibold">
@@ -221,8 +372,8 @@ export default function BriefingPage() {
 					</h3>
 					<p className="mt-2 text-sm text-muted-foreground">
 						When a year advances, every resource level rises by one and the
-						corresponding row is added automatically. Morale reductions are
-						applied afterward.
+						corresponding row is added automatically. Morale bonuses are applied
+						as part of the same annual update.
 					</p>
 					<div className="mt-4 overflow-x-auto border">
 						<table className="w-full min-w-xl text-sm">

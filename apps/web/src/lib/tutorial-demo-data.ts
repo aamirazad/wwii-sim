@@ -49,6 +49,8 @@ export function getTutorialDemoData(
 		populationLevel: 7,
 		morale: 68,
 		tokens: 2,
+		scrapDrivesUsed: 1,
+		lastScrapDriveYear: 1940,
 		lastProcessedYear: 1941,
 		createdAt: minutesAgo(180),
 		updatedAt: minutesAgo(1),

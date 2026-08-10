@@ -103,6 +103,8 @@ export const countryStateTable = t.sqliteTable("country_state", {
 	populationLevel: t.int("population_level").default(5).notNull(),
 	morale: t.int("morale").default(50).notNull(),
 	tokens: t.int("tokens").default(0).notNull(),
+	scrapDrivesUsed: t.int("scrap_drives_used").default(0).notNull(),
+	lastScrapDriveYear: t.int("last_scrap_drive_year"),
 	lastProcessedYear: t.int("last_processed_year").default(1938).notNull(),
 	createdAt: t
 		.integer("created_at", { mode: "timestamp" })

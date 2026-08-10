@@ -82,7 +82,11 @@ const HELP: Record<string, Array<{ title: string; body: string }>> = {
 		},
 		{
 			title: "Morale",
-			body: "Morale is reviewed each year. At 20–39, all production is reduced by 10%; at 1–19, it is reduced by 25%. A country reaching zero morale loses the game.",
+			body: "Morale bonuses apply before annual production. At 51–70 gain 1 oil, 1 steel, and 5 population; at 71–80 gain 2 oil, 2 steel, and 5 population; at 81–90 gain 3 oil, 3 steel, and 6 population; at 91–100 gain one extra level of every resource. Low morale carries political consequences determined by moderators.",
+		},
+		{
+			title: "Scrap metal drives",
+			body: "A country may hold one drive per year and three in the entire game. The first rolls 4d6 steel, the second 2d6, and the third 1d6. The result is immediately recorded in resources and the audit log.",
 		},
 	],
 };

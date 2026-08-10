@@ -281,6 +281,8 @@ export const CountryStateSchema = t.Object({
 	populationLevel: t.Number(),
 	morale: t.Number(),
 	tokens: t.Number(),
+	scrapDrivesUsed: t.Number(),
+	lastScrapDriveYear: t.Union([t.Number(), t.Null()]),
 	lastProcessedYear: t.Number(),
 	createdAt: t.Date(),
 	updatedAt: t.Date(),

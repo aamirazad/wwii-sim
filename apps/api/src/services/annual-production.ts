@@ -53,15 +53,17 @@ export async function processAnnualProduction(
 						? state.oil
 						: Math.max(
 								0,
-								state.oil + production.oil + moraleEffect.resourceDelta,
+								state.oil + production.oil + moraleEffect.resourceDelta.oil,
 							),
 				steel: Math.max(
 					0,
-					state.steel + production.steel + moraleEffect.resourceDelta,
+					state.steel + production.steel + moraleEffect.resourceDelta.steel,
 				),
 				population: Math.max(
 					0,
-					state.population + production.population + moraleEffect.resourceDelta,
+					state.population +
+						production.population +
+						moraleEffect.resourceDelta.population,
 				),
 			};
 

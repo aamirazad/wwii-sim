@@ -52,6 +52,9 @@ export default function OperationsPage() {
 	const [troops, setTroops] = useState({ ...ZERO_TROOPS });
 	const [plan, setPlan] = useState("");
 	const [error, setError] = useState<string | null>(null);
+	const [moderatorNotes, setModeratorNotes] = useState<Record<number, string>>(
+		{},
+	);
 
 	useGamePageGuard({ requires: "active-game", gameState, userState });
 	const gameId = gameState.status === "has-game" ? gameState.game.id : null;
@@ -155,12 +158,28 @@ export default function OperationsPage() {
 		refresh();
 	};
 
-	const updateStatus = async (actionId: number, status: ActionStatus) => {
+	const updateStatus = async (
+		actionId: number,
+		status: ActionStatus,
+		currentResponse: string | null,
+	) => {
 		if (!userId || !gameId) return;
-		await api
+		const response = await api
 			.game({ gameId: String(gameId) })
 			.actions({ actionId: String(actionId) })
-			.patch({ status }, { query: { authorization: userId } });
+			.patch(
+				{
+					status,
+					response:
+						(moderatorNotes[actionId] ?? currentResponse ?? "").trim() ||
+						undefined,
+				},
+				{ query: { authorization: userId } },
+			);
+		if (response.error) {
+			setError(response.error.value.message ?? "Could not update operation");
+			return;
+		}
 		refresh();
 	};
 
@@ -371,11 +390,47 @@ export default function OperationsPage() {
 										</Badge>
 									</div>
 									<p className="mt-3 text-sm">{action.description}</p>
+									{typeof action.payload?.sourceLocationName === "string" && (
+										<p className="mt-2 text-sm text-muted-foreground">
+											Leaves from: {action.payload.sourceLocationName}
+										</p>
+									)}
 									{typeof action.payload?.targetLocation === "string" && (
 										<p className="mt-2 flex items-center gap-1 text-sm text-muted-foreground">
 											<MapPin className="size-3" /> Target:{" "}
 											{String(action.payload.targetLocation)}
 										</p>
+									)}
+									{typeof action.payload?.troops === "object" &&
+										action.payload.troops !== null && (
+											<div className="mt-3 flex flex-wrap gap-2">
+												{TROOP_TYPES.map((troopType) => {
+													const amount =
+														Number(
+															(
+																action.payload?.troops as Record<
+																	string,
+																	unknown
+																>
+															)[troopType],
+														) || 0;
+													return amount > 0 ? (
+														<Badge key={troopType} variant="secondary">
+															{TROOP_LABELS[troopType]}: {amount}
+														</Badge>
+													) : null;
+												})}
+											</div>
+										)}
+									{typeof action.payload?.plan === "string" && (
+										<div className="mt-3 border-l-2 border-border pl-3">
+											<p className="text-xs font-semibold text-muted-foreground">
+												Private battle plan
+											</p>
+											<p className="mt-1 whitespace-pre-wrap text-sm leading-6">
+												{action.payload.plan}
+											</p>
+										</div>
 									)}
 									{action.response && (
 										<p className="mt-3 border-l-2 border-primary pl-3 text-sm">
@@ -383,34 +438,67 @@ export default function OperationsPage() {
 										</p>
 									)}
 									{isMod && (
-										<div className="mt-3 flex flex-wrap gap-2">
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() => updateStatus(action.id, "in_progress")}
-											>
-												Start
-											</Button>
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() => updateStatus(action.id, "approved")}
-											>
-												Approve
-											</Button>
-											<Button
-												size="sm"
-												onClick={() => updateStatus(action.id, "resolved")}
-											>
-												Resolve
-											</Button>
-											<Button
-												size="sm"
-												variant="destructive"
-												onClick={() => updateStatus(action.id, "denied")}
-											>
-												Deny
-											</Button>
+										<div className="mt-4 space-y-3 border-t pt-3">
+											<div className="space-y-1.5">
+												<Label htmlFor={`moderator-note-${action.id}`}>
+													Resolution record
+												</Label>
+												<Textarea
+													id={`moderator-note-${action.id}`}
+													className="min-h-20"
+													value={
+														moderatorNotes[action.id] ?? action.response ?? ""
+													}
+													onChange={(event) =>
+														setModeratorNotes((current) => ({
+															...current,
+															[action.id]: event.target.value,
+														}))
+													}
+													placeholder="Record the roll, winner, casualties, retreat, surviving forces, and final territory."
+												/>
+											</div>
+											<div className="flex flex-wrap gap-2">
+												<Button
+													size="sm"
+													variant="outline"
+													onClick={() =>
+														updateStatus(
+															action.id,
+															"in_progress",
+															action.response,
+														)
+													}
+												>
+													Start
+												</Button>
+												<Button
+													size="sm"
+													variant="outline"
+													onClick={() =>
+														updateStatus(action.id, "approved", action.response)
+													}
+												>
+													Approve
+												</Button>
+												<Button
+													size="sm"
+													onClick={() =>
+														updateStatus(action.id, "resolved", action.response)
+													}
+												>
+													Resolve
+												</Button>
+												<Button
+													size="sm"
+													variant="destructive"
+													onClick={() =>
+														updateStatus(action.id, "denied", action.response)
+													}
+												>
+													Deny
+												</Button>
+											</div>
 										</div>
 									)}
 								</div>

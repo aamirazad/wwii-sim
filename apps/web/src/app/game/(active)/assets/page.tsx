@@ -1494,6 +1494,11 @@ function TroopLocationEditor({
 
 	return (
 		<div className="space-y-4">
+			<p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+				Existing location names are locked. Add a new location to move forces,
+				then record losses by lowering troop counts.{" "}
+				<InlineHelp text="Renaming an existing position would move troops without paying oil, so saved names cannot be edited. Empty locations can be removed." />
+			</p>
 			{/* Totals summary */}
 			{hasTroops && (
 				<div className="flex flex-wrap gap-3 rounded-lg border bg-muted/30 p-3 text-sm">
