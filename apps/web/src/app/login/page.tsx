@@ -8,6 +8,7 @@ import FullAlert from "@/components/full-alert";
 import LoadingSpinner from "@/components/loading-spinner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { api } from "@/lib/api";
+import { setUserId } from "@/lib/cookies";
 
 function App() {
 	const searchParams = useSearchParams();
@@ -23,22 +24,14 @@ function App() {
 			return response.data;
 		},
 		enabled: !!id,
-		retry: 0,
+		retry: 3,
 	});
 
 	useEffect(() => {
 		if (!data || data.error || !data.user?.id) return;
 
-		const setCookieAndRedirect = async () => {
-			await cookieStore.set({
-				name: "userId",
-				value: data.user.id,
-				expires: Date.now() + 31536000000,
-			});
-			router.push("/game/join");
-		};
-
-		setCookieAndRedirect();
+		setUserId(data.user.id);
+		router.replace("/game/join");
 	}, [data, router]);
 
 	if (isLoading) {

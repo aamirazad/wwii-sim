@@ -57,6 +57,12 @@ import {
 	UserSchema,
 	type YearDurations,
 } from "./schema";
+import {
+	cacheUser,
+	getCachedUser,
+	invalidateCachedUser,
+} from "./services/auth-cache";
+import { queueGameInvitations } from "./services/email";
 import { yearScheduler } from "./services/year-scheduler";
 
 const calculateTradeCosts = (resources: {
@@ -82,6 +88,11 @@ const calculateTradeCosts = (resources: {
 	};
 };
 
+const configuredOrigins = (process.env.CORS_ORIGIN || "")
+	.split(",")
+	.map((origin) => origin.trim())
+	.filter(Boolean);
+
 const app = new Elysia()
 	.use(
 		openapi({
@@ -96,8 +107,11 @@ const app = new Elysia()
 	)
 	.use(
 		cors({
-			origin:
+			origin: [
 				/^(?:https?:\/\/)?(?:sim\.aamirazad\.com|[A-Za-z0-9-]+-aamira\.vercel\.app|localhost:3000)(?:\/.*)?$/,
+				...configuredOrigins,
+			],
+			maxAge: 86400,
 		}),
 	)
 	.get("/", () => "WWII Sim API", {
@@ -118,10 +132,7 @@ const app = new Elysia()
 	.get(
 		"/user/:id",
 		async ({ params, set }) => {
-			const [user] = await db
-				.select()
-				.from(usersTable)
-				.where(eq(usersTable.id, params.id));
+			const user = await getCachedUser(params.id);
 
 			if (!user) {
 				set.status = 404;
@@ -175,10 +186,7 @@ const app = new Elysia()
 			ws.subscribe("global");
 		},
 		async message(ws, message) {
-			const [authenticatedUser] = await db
-				.select()
-				.from(usersTable)
-				.where((table) => eq(table.id, message.token));
+			const authenticatedUser = await getCachedUser(message.token);
 
 			if (!authenticatedUser) {
 				ws.send({
@@ -282,12 +290,9 @@ const app = new Elysia()
 			return { error: true, message: "Missing authorization header" };
 		}
 
-		const user = await db
-			.select()
-			.from(usersTable)
-			.where(eq(usersTable.id, authHeader));
+		const user = await getCachedUser(authHeader);
 
-		if (user.length === 0) {
+		if (!user) {
 			set.status = 401;
 			return { error: true, message: "Invalid authorization header" };
 		}
@@ -381,6 +386,7 @@ const app = new Elysia()
 		"/users",
 		async ({ body }) => {
 			const [newUser] = await db.insert(usersTable).values(body).returning();
+			cacheUser(newUser);
 			return {
 				id: newUser.id,
 				username: newUser.username,
@@ -433,6 +439,7 @@ const app = new Elysia()
 				set.status = 404;
 				return { error: true as const, message: "User not found" };
 			}
+			invalidateCachedUser(updatedUser.id);
 
 			return {
 				error: false as const,
@@ -613,6 +620,8 @@ const app = new Elysia()
 					updatedAt: countryState.updatedAt,
 				});
 			}
+
+			queueGameInvitations(newGame.id);
 
 			return {
 				error: false as const,

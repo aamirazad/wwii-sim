@@ -107,9 +107,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
 			userId && !isTutorialDemo ? `${wsUrl}?authorization=${userId}` : null,
 			{
 				shouldReconnect: () => true,
-				reconnectAttempts: 10,
+				reconnectAttempts: Number.POSITIVE_INFINITY,
 				reconnectInterval: (attemptNumber) =>
-					Math.min(1000 * 2 ** attemptNumber, 30000),
+					Math.min(500 * 2 ** attemptNumber, 10000),
 				share: true,
 			},
 		);
@@ -215,7 +215,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 			if (response.error) throw new Error("Failed to fetch game");
 			return response.data;
 		},
-		retry: 0,
+		retry: 3,
 		enabled: isHydrated && !!userId && !isTutorialDemo,
 		refetchInterval: 30000, // 30s - handles waiting/lobby state and missed WS messages
 		refetchOnReconnect: true,
@@ -236,10 +236,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
 			return response.data;
 		},
 		enabled: isHydrated && !!userId && !isTutorialDemo,
-		refetchInterval: 60000, // 1min - catches country assignment changes
+		refetchInterval: 300000, // 5min - cached server lookup catches assignment changes
 		refetchOnReconnect: true,
 		refetchOnWindowFocus: true,
-		retry: 0,
+		retry: 3,
 	});
 
 	const gameState: GameState = (() => {

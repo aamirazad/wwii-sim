@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Background from "@/components/background";
 import LoadingSpinner from "@/components/loading-spinner";
+import { clearUserId } from "@/lib/cookies";
 
 /**
  * Logout page that removes the userId cookie using the Cookie Store API
@@ -13,19 +14,8 @@ export default function LogoutPage() {
 	const router = useRouter();
 
 	useEffect(() => {
-		const performLogout = async () => {
-			try {
-				// Remove the login cookie
-				await cookieStore.delete("userId");
-			} catch (error) {
-				console.error("Failed to clear cookie:", error);
-			} finally {
-				// Redirect to home
-				router.push("/");
-			}
-		};
-
-		performLogout();
+		clearUserId();
+		router.replace("/");
 	}, [router]);
 
 	return (

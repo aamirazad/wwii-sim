@@ -80,8 +80,9 @@ export function setCookie(
 	} = {},
 ): void {
 	const { maxAge = ONE_YEAR_IN_SECONDS, path = "/" } = options;
+	const secure = window.location.protocol === "https:" ? "; Secure" : "";
 	// biome-ignore lint/suspicious/noDocumentCookie: This is a cookie utility
-	document.cookie = `${name}=${encodeURIComponent(value)}; max-age=${maxAge}; path=${path}`;
+	document.cookie = `${name}=${encodeURIComponent(value)}; max-age=${maxAge}; path=${path}; SameSite=Lax${secure}`;
 }
 
 /**
@@ -96,7 +97,16 @@ export function deleteCookie(name: string, path = "/"): void {
  * Get the userId from the cookie
  */
 export function getUserId(): string | null {
-	return getCookie("userId");
+	const cookieId = getCookie("userId");
+	if (cookieId) return cookieId;
+	if (typeof window === "undefined") return null;
+	try {
+		const storedId = window.localStorage.getItem("wwii-sim-user-id");
+		if (storedId) setCookie("userId", storedId);
+		return storedId;
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -104,6 +114,11 @@ export function getUserId(): string | null {
  */
 export function setUserId(userId: string): void {
 	setCookie("userId", userId);
+	try {
+		window.localStorage.setItem("wwii-sim-user-id", userId);
+	} catch {
+		// The cookie remains the primary credential when storage is unavailable.
+	}
 }
 
 /**
@@ -111,6 +126,11 @@ export function setUserId(userId: string): void {
  */
 export function clearUserId(): void {
 	deleteCookie("userId");
+	try {
+		window.localStorage.removeItem("wwii-sim-user-id");
+	} catch {
+		// Nothing else to clear.
+	}
 }
 
 export function getTutorialState(): TutorialState {
