@@ -1,10 +1,10 @@
 # AGENTS.md
 
 ## Setup commands
-- Install deps: `bun install`
-- Do not start the dev server. Do not run `bun run build`
-- Run linter `bun lint`
-- Write linter suggestions `bun lint --write`
+- Install deps: `pnpm install`
+- Do not start the dev server. Do not run `pnpm build`
+- Run linter `pnpm lint`
+- Write linter suggestions `pnpm lint --write`
 
 ## Project Setup
 

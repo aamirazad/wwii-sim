@@ -293,9 +293,11 @@ function ScheduleRow({
 			</td>
 			<td className="px-4 py-3 text-muted-foreground">
 				{isPast ? (
-					<span className="text-yellow-500">Past</span>
+					<span className="text-amber-700 dark:text-amber-400">Past</span>
 				) : (
-					<span className="text-green-500">Scheduled</span>
+					<span className="text-emerald-700 dark:text-emerald-400">
+						Scheduled
+					</span>
 				)}
 			</td>
 			<td className="px-4 py-3">

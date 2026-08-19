@@ -6,6 +6,7 @@ import {
 	type GameYear,
 	type PlayableCountry,
 } from "@api/schema";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDownIcon } from "lucide-react";
 import { redirect, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -41,8 +42,24 @@ type CountriesConfig = Record<PlayableCountry, CountryConfig>;
 
 const DEFAULT_YEAR_DURATION = 46;
 
+function getCreateGameError(error: unknown): string {
+	if (!error || typeof error !== "object") return "Failed to create game";
+
+	const { status, value } = error as { status?: number; value?: unknown };
+	if (typeof value === "string" && value.trim()) return value;
+	if (value && typeof value === "object" && "message" in value) {
+		const message = (value as { message?: unknown }).message;
+		if (typeof message === "string" && message.trim()) return message;
+	}
+
+	return status
+		? `Failed to create game (server returned ${status})`
+		: "Failed to create game";
+}
+
 export default function CreateGamePage() {
 	const router = useRouter();
+	const queryClient = useQueryClient();
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [open, setOpen] = useState(false);
@@ -102,13 +119,24 @@ export default function CreateGamePage() {
 			);
 
 			if (response.error) {
-				const errData = response.error as { value?: { message?: string } };
 				window.scrollTo(0, 0);
-				setError(errData.value?.message || "Failed to create game");
+				setError(getCreateGameError(response.error));
+				return;
+			}
+			if (response.data.error) {
+				window.scrollTo(0, 0);
+				setError(response.data.message);
 				return;
 			}
 
-			router.push("/game/join");
+			queryClient.setQueryData(["game", "current"], {
+				exists: true,
+				game: {
+					...response.data.game,
+					currentYear: 1938,
+				},
+			});
+			router.replace("/game/join");
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "An error occurred");
 		} finally {

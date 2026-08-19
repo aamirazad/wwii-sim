@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-	allowedDevOrigins: ["3000.aamirazad.com"],
+	allowedDevOrigins: ["3000.aamirazad.com", "127.0.0.1"],
 	env: {
 		NEXT_PUBLIC_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA,
 	},

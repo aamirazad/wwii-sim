@@ -56,17 +56,17 @@ export function AnnouncementToastListener() {
 
 						<div className="flex-1 min-w-0 relative z-10">
 							<div className="flex items-center justify-between mb-1">
-								<p className="font-bold text-base text-slate-100 tracking-tight">
+								<p className="text-base font-bold tracking-tight text-foreground">
 									New Announcement
 								</p>
 							</div>
 
-							<p className="text-sm text-slate-300 line-clamp-2 leading-relaxed mb-2">
+							<p className="mb-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
 								{cleanPreview}
 							</p>
 
 							<div className="flex items-center gap-2">
-								<div className="h-1px grow bg-white/5" />
+								<div className="h-px grow bg-border" />
 								<p className="text-[10px] uppercase font-bold text-muted-foreground whitespace-nowrap">
 									By {announcement.createdBy}
 								</p>
@@ -76,7 +76,7 @@ export function AnnouncementToastListener() {
 
 					<button
 						type="button"
-						className="pl-15 pb-5 justify-self-end text-slate-400 hover:text-slate-200 relative z-10"
+						className="relative z-10 justify-self-end pb-5 pl-15 text-muted-foreground hover:text-foreground"
 						onClick={() => toast.dismiss()}
 					>
 						<X />

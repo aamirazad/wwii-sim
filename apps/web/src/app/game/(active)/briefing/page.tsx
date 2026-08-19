@@ -2,20 +2,15 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dices, Flag, Gauge, ScrollText } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import CountryDashboard from "@/components/country-dashboard";
+import DataErrorState from "@/components/data-error-state";
 import LoadingSpinner from "@/components/loading-spinner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { useGamePageGuard } from "@/hooks/useGamePageGuard";
 import { api } from "@/lib/api";
 import { getUserId } from "@/lib/cookies";
@@ -30,9 +25,7 @@ export default function BriefingPage() {
 	const { gameState, userState } = useGame();
 	const userId = getUserId();
 	const queryClient = useQueryClient();
-	const [selectedCountryId, setSelectedCountryId] = useState<number | null>(
-		null,
-	);
+	const searchParams = useSearchParams();
 	const [stats, setStats] = useState<Record<string, string>>({});
 	const [savingStats, setSavingStats] = useState(false);
 	const [statsMessage, setStatsMessage] = useState<string | null>(null);
@@ -47,7 +40,12 @@ export default function BriefingPage() {
 		userState.status === "authenticated" &&
 		(userState.user.country === "Mods" || userState.user.role === "admin");
 
-	const { data: countriesData } = useQuery({
+	const {
+		data: countriesData,
+		isLoading: countriesLoading,
+		isError: countriesError,
+		refetch: refetchCountries,
+	} = useQuery({
 		queryKey: ["countries", gameId],
 		queryFn: async () => {
 			if (!userId || !gameId) throw new Error("Not ready");
@@ -56,24 +54,28 @@ export default function BriefingPage() {
 				.countries.get({ query: { authorization: userId } });
 			if (response.error || !response.data || response.data.error)
 				throw new Error("Failed to load countries");
-			return response.data.countries;
+			return response.data;
 		},
 		enabled: !!userId && !!gameId,
 	});
 
-	const countries = useMemo(
-		() => (countriesData ?? []).filter((item) => item.name !== "Mods"),
-		[countriesData],
-	);
+	const countries =
+		countriesData && !countriesData.error ? countriesData.countries : [];
+	const selectedCountry = searchParams.get("country");
 	const country = useMemo(() => {
 		if (isMod)
 			return (
-				countries.find((item) => item.id === selectedCountryId) ?? countries[0]
+				countries.find((item) => item.name === selectedCountry) ?? countries[0]
 			);
 		return countries.find((item) => item.name === userCountry);
-	}, [countries, isMod, selectedCountryId, userCountry]);
+	}, [countries, isMod, selectedCountry, userCountry]);
 
-	const { data, isLoading } = useQuery({
+	const {
+		data,
+		isLoading,
+		isError,
+		refetch: refetchRules,
+	} = useQuery({
 		queryKey: ["country-rules", gameId, country?.id],
 		queryFn: async () => {
 			if (!userId || !gameId || !country) throw new Error("Not ready");
@@ -93,8 +95,66 @@ export default function BriefingPage() {
 		enabled: !!userId && !!gameId && !!country,
 	});
 
-	if (gameState.status !== "has-game" || !country || !data || isLoading)
+	useEffect(() => {
+		if (country?.id === undefined) return;
+		setStats({});
+		setStatsMessage(null);
+		setScrapResult(null);
+	}, [country?.id]);
+
+	if (
+		gameState.status === "loading" ||
+		userState.status === "loading" ||
+		gameState.status === "no-game" ||
+		countriesLoading
+	) {
 		return <LoadingSpinner />;
+	}
+
+	if (gameState.status === "error" || userState.status === "error") {
+		return (
+			<DataErrorState
+				title="Unable to load the briefing"
+				message={
+					gameState.status === "error"
+						? gameState.message
+						: userState.status === "error"
+							? userState.message
+							: undefined
+				}
+			/>
+		);
+	}
+
+	if (gameState.status !== "has-game") return <LoadingSpinner />;
+
+	if (countriesError || (!countriesLoading && !country)) {
+		return (
+			<CountryDashboard tab="Briefing">
+				<DataErrorState
+					title="Country briefing is unavailable"
+					message="Your assigned country was not initialized for this game. Try again or ask an administrator to recreate the game."
+					onRetry={() => refetchCountries()}
+				/>
+			</CountryDashboard>
+		);
+	}
+
+	if (isError) {
+		return (
+			<CountryDashboard tab="Briefing">
+				<DataErrorState
+					title="Unable to load country rules"
+					message="The briefing data could not be loaded from the server."
+					onRetry={() => {
+						void Promise.all([refetchCountries(), refetchRules()]);
+					}}
+				/>
+			</CountryDashboard>
+		);
+	}
+
+	if (!country || !data || isLoading) return <LoadingSpinner />;
 	const { rules } = data;
 	const currentLevels = {
 		oil: country.oilLevel,
@@ -171,30 +231,6 @@ export default function BriefingPage() {
 							the simulation.
 						</p>
 					</div>
-					{isMod && (
-						<div className="w-64 space-y-2">
-							<Label>Inspect country</Label>
-							<Select
-								value={String(country.id)}
-								onValueChange={(value) => {
-									setSelectedCountryId(Number(value));
-									setStats({});
-									setStatsMessage(null);
-								}}
-							>
-								<SelectTrigger>
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									{countries.map((item) => (
-										<SelectItem key={item.id} value={String(item.id)}>
-											{item.name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
-					)}
 				</div>
 
 				<section>

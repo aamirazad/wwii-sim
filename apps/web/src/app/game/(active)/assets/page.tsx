@@ -3,6 +3,7 @@
 import type {
 	Country,
 	CountryState,
+	PlayableCountry,
 	ResourceChangeLog,
 	TradeRequest,
 	TroopChangeLog,
@@ -12,6 +13,7 @@ import type {
 	User,
 } from "@api/schema";
 import {
+	PLAYABLE_COUNTRIES,
 	TROOP_COSTS,
 	TROOP_LABELS,
 	TROOP_TYPES,
@@ -35,6 +37,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { type SubmitEvent, Suspense, useEffect, useState } from "react";
 import { useGame } from "@/app/game/GameContext";
 import CountryDashboard from "@/components/country-dashboard";
+import DataErrorState from "@/components/data-error-state";
 import GoBack from "@/components/go-back";
 import { InlineHelp } from "@/components/inline-help";
 import LoadingSpinner from "@/components/loading-spinner";
@@ -76,18 +79,6 @@ import {
 	loadTutorialDemoState,
 	saveTutorialDemoState,
 } from "@/lib/tutorial-demo-state";
-
-// Countries that mods can manage
-const PLAYABLE_COUNTRIES: Country[] = [
-	"Commonwealth",
-	"France",
-	"Germany",
-	"Italy",
-	"Japan",
-	"Russia",
-	"United Kingdom",
-	"United States",
-];
 
 function ResourceCard({
 	name,
@@ -327,7 +318,7 @@ function ResourceChangeForm({
 								type="text"
 								placeholder="+50, 12*3, or -(8+2)"
 								value={value}
-								className={`transition-all duration-200 ${(evaluateMathExpression(value) ?? 0) < 0 ? "text-rose-300" : "text-emerald-300"}`}
+								className={`transition-all duration-200 ${(evaluateMathExpression(value) ?? 0) < 0 ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-300"}`}
 								onChange={(e) => {
 									const v = e.target.value;
 									setValue(v);
@@ -522,7 +513,7 @@ function HistoryDialog({
 														<tr key={log.id} className="border-t">
 															<td
 																title={`Changed by ${log.changedBy}`}
-																className={`truncate min-w-24 max-w-24 px-3 py-2 font-mono ${isPositive ? "text-emerald-300" : "text-rose-300"}`}
+																className={`truncate min-w-24 max-w-24 px-3 py-2 font-mono ${isPositive ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}
 															>
 																{isPositive ? "+" : ""}
 																{change.toLocaleString()}
@@ -1265,7 +1256,7 @@ function TroopPurchaseForm({
 					</datalist>
 
 					{allocationErrors.length > 0 && (
-						<div className="mt-2 text-sm text-amber-400">
+						<div className="mt-2 text-sm text-amber-700 dark:text-amber-400">
 							Unallocated: {allocationErrors.join(", ")}
 						</div>
 					)}
@@ -1693,10 +1684,10 @@ function TroopHistoryDialog({
 									<span
 										className={`font-medium ${
 											log.actionType === "purchase"
-												? "text-emerald-400"
+												? "text-emerald-700 dark:text-emerald-400"
 												: log.actionType === "movement"
-													? "text-blue-400"
-													: "text-red-400"
+													? "text-blue-700 dark:text-blue-400"
+													: "text-red-700 dark:text-red-400"
 										}`}
 									>
 										{log.actionType === "purchase"
@@ -1764,17 +1755,23 @@ function LiveAssets() {
 	}, [searchParams]);
 
 	const setPageTab = (newTab: string) => {
-		router.push(`/game/assets?tab=${newTab}`);
+		const params = new URLSearchParams(searchParams.toString());
+		params.set("tab", newTab);
+		router.push(`/game/assets?${params.toString()}`);
 	};
 
 	const userCountry =
 		userState.status === "authenticated" ? userState.user.country : null;
-	const isMod = userCountry === "Mods";
+	const isMod =
+		userCountry === "Mods" ||
+		(userState.status === "authenticated" && userState.user.role === "admin");
 
-	// For mods: track selected country
-	const [selectedCountry, setSelectedCountry] = useState<Country>(
-		PLAYABLE_COUNTRIES[0],
-	);
+	const countryParam = searchParams.get("country");
+	const selectedCountry = PLAYABLE_COUNTRIES.includes(
+		countryParam as PlayableCountry,
+	)
+		? (countryParam as PlayableCountry)
+		: PLAYABLE_COUNTRIES[0];
 
 	// The country to fetch data for - either user's country or mod's selected country
 	const targetCountry = isMod ? selectedCountry : userCountry;
@@ -1783,9 +1780,14 @@ function LiveAssets() {
 	const {
 		data: countryData,
 		isLoading: countryLoading,
+		isError: countryError,
 		refetch: refetchCountry,
 	} = useQuery({
-		queryKey: ["country-state", gameState, targetCountry],
+		queryKey: [
+			"country-state",
+			gameState.status === "has-game" ? gameState.game.id : null,
+			targetCountry,
+		],
 		queryFn: async () => {
 			if (!userId || gameState.status !== "has-game" || !targetCountry)
 				throw new Error("Not ready");
@@ -1846,6 +1848,29 @@ function LiveAssets() {
 		staleTime: 10000,
 	});
 
+	if (
+		gameState.status === "loading" ||
+		userState.status === "loading" ||
+		gameState.status === "no-game"
+	) {
+		return <LoadingSpinner />;
+	}
+
+	if (gameState.status === "error" || userState.status === "error") {
+		return (
+			<DataErrorState
+				title="Unable to load assets"
+				message={
+					gameState.status === "error"
+						? gameState.message
+						: userState.status === "error"
+							? userState.message
+							: undefined
+				}
+			/>
+		);
+	}
+
 	if (gameState.status !== "has-game") return <LoadingSpinner />;
 
 	// For mods, we don't use countryResources from context (which would be empty for "Mods")
@@ -1858,12 +1883,35 @@ function LiveAssets() {
 					population: countryData.country.population,
 				}
 			: null
-		: countryResources;
+		: (countryResources ??
+			(countryState
+				? {
+						oil: countryState.oil,
+						steel: countryState.steel,
+						population: countryState.population,
+					}
+				: null));
+
+	if (countryError) {
+		return (
+			<CountryDashboard tab="Assets">
+				<DataErrorState
+					title="Unable to load country assets"
+					message="Your country data is unavailable. The game may not have finished initializing."
+					onRetry={() => refetchCountry()}
+				/>
+			</CountryDashboard>
+		);
+	}
 
 	if (!countryState && !countryLoading) {
 		return (
 			<CountryDashboard tab="Assets">
-				<p className="text-muted-foreground">Unable to load country data.</p>
+				<DataErrorState
+					title="Country data is missing"
+					message="This game does not have data for your assigned country. Ask an administrator to recreate the game."
+					onRetry={() => refetchCountry()}
+				/>
 			</CountryDashboard>
 		);
 	}
@@ -1887,33 +1935,6 @@ function LiveAssets() {
 	return (
 		<CountryDashboard tab="Assets">
 			<div className="space-y-8">
-				{/* Country Selector for Mods */}
-				{isMod && (
-					<div
-						className="flex items-center gap-4"
-						data-tutorial="mod-country-selector"
-					>
-						<Label htmlFor="country-select" className="text-lg font-semibold">
-							Select Country:
-						</Label>
-						<Select
-							value={selectedCountry}
-							onValueChange={(value) => setSelectedCountry(value as Country)}
-						>
-							<SelectTrigger className="w-50">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{PLAYABLE_COUNTRIES.map((country) => (
-									<SelectItem key={country} value={country}>
-										{country}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
-				)}
-
 				{/* Resource Cards */}
 				{displayResources && countryState && (
 					<>

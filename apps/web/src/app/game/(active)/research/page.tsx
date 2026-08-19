@@ -2,20 +2,14 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, Check, FlaskConical, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import CountryDashboard from "@/components/country-dashboard";
+import DataErrorState from "@/components/data-error-state";
 import LoadingSpinner from "@/components/loading-spinner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useGamePageGuard } from "@/hooks/useGamePageGuard";
 import { api } from "@/lib/api";
@@ -26,9 +20,7 @@ export default function ResearchPage() {
 	const { gameState, userState } = useGame();
 	const userId = getUserId();
 	const queryClient = useQueryClient();
-	const [selectedCountryId, setSelectedCountryId] = useState<number | null>(
-		null,
-	);
+	const searchParams = useSearchParams();
 	const [selectedResearch, setSelectedResearch] = useState<string | null>(null);
 	const [plan, setPlan] = useState("");
 	const [error, setError] = useState<string | null>(null);
@@ -42,7 +34,12 @@ export default function ResearchPage() {
 	const userCountry =
 		userState.status === "authenticated" ? userState.user.country : null;
 
-	const { data: countriesData } = useQuery({
+	const {
+		data: countriesData,
+		isLoading: countriesLoading,
+		isError: countriesError,
+		refetch: refetchCountries,
+	} = useQuery({
 		queryKey: ["countries", gameId],
 		queryFn: async () => {
 			if (!userId || !gameId) throw new Error("Not ready");
@@ -59,16 +56,22 @@ export default function ResearchPage() {
 
 	const countries =
 		countriesData && !countriesData.error ? countriesData.countries : [];
+	const selectedCountry = searchParams.get("country");
 	const country = useMemo(() => {
 		if (isMod) {
 			return (
-				countries.find((item) => item.id === selectedCountryId) ?? countries[0]
+				countries.find((item) => item.name === selectedCountry) ?? countries[0]
 			);
 		}
 		return countries.find((item) => item.name === userCountry);
-	}, [countries, isMod, selectedCountryId, userCountry]);
+	}, [countries, isMod, selectedCountry, userCountry]);
 
-	const { data: researchData, isLoading } = useQuery({
+	const {
+		data: researchData,
+		isLoading,
+		isError,
+		refetch: refetchResearch,
+	} = useQuery({
 		queryKey: ["research", gameId, country?.id],
 		queryFn: async () => {
 			if (!userId || !gameId || !country) throw new Error("Not ready");
@@ -88,6 +91,13 @@ export default function ResearchPage() {
 		},
 		enabled: !!userId && !!gameId && !!country,
 	});
+
+	useEffect(() => {
+		if (country?.id === undefined) return;
+		setSelectedResearch(null);
+		setPlan("");
+		setError(null);
+	}, [country?.id]);
 
 	const refresh = () => {
 		queryClient.invalidateQueries({
@@ -133,13 +143,58 @@ export default function ResearchPage() {
 	};
 
 	if (
-		gameState.status !== "has-game" ||
-		!country ||
-		isLoading ||
-		!researchData
+		gameState.status === "loading" ||
+		userState.status === "loading" ||
+		gameState.status === "no-game" ||
+		countriesLoading
 	) {
 		return <LoadingSpinner />;
 	}
+
+	if (gameState.status === "error" || userState.status === "error") {
+		return (
+			<DataErrorState
+				title="Unable to load research"
+				message={
+					gameState.status === "error"
+						? gameState.message
+						: userState.status === "error"
+							? userState.message
+							: undefined
+				}
+			/>
+		);
+	}
+
+	if (gameState.status !== "has-game") return <LoadingSpinner />;
+
+	if (countriesError || (!countriesLoading && !country)) {
+		return (
+			<CountryDashboard tab="Research">
+				<DataErrorState
+					title="Country research is unavailable"
+					message="Your assigned country was not initialized for this game. Try again or ask an administrator to recreate the game."
+					onRetry={() => refetchCountries()}
+				/>
+			</CountryDashboard>
+		);
+	}
+
+	if (isError) {
+		return (
+			<CountryDashboard tab="Research">
+				<DataErrorState
+					title="Unable to load research data"
+					message="Research levels and requests could not be loaded from the server."
+					onRetry={() => {
+						void Promise.all([refetchCountries(), refetchResearch()]);
+					}}
+				/>
+			</CountryDashboard>
+		);
+	}
+
+	if (!country || isLoading || !researchData) return <LoadingSpinner />;
 
 	const stateByType = new Map(
 		researchData.states.map((state) => [state.researchType, state]),
@@ -164,26 +219,6 @@ export default function ResearchPage() {
 							materials.
 						</p>
 					</div>
-					{isMod && (
-						<div className="w-64 space-y-2">
-							<Label>Review country</Label>
-							<Select
-								value={String(country.id)}
-								onValueChange={(value) => setSelectedCountryId(Number(value))}
-							>
-								<SelectTrigger>
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									{countries.map((item) => (
-										<SelectItem key={item.id} value={String(item.id)}>
-											{item.name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
-					)}
 				</div>
 
 				{error && (

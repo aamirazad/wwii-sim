@@ -1,7 +1,7 @@
 "use client";
 
 import type { ClientMessage, Game, User } from "@api/schema";
-import { Clock, Users } from "lucide-react";
+import { Clock, Mail, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -20,6 +20,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useGamePageGuard } from "@/hooks/useGamePageGuard";
+import { api } from "@/lib/api";
 
 function UnauthenticatedView() {
 	const router = useRouter();
@@ -100,6 +101,59 @@ function GameWaiting({
 		seconds: number;
 	} | null>(null);
 	const [isPastStartDate, setIsPastStartDate] = useState(false);
+	const [isSendingEmails, setIsSendingEmails] = useState(false);
+	const [emailResult, setEmailResult] = useState<{
+		variant: "default" | "destructive";
+		message: string;
+	} | null>(null);
+
+	const handleSendLoginEmails = async () => {
+		setIsSendingEmails(true);
+		setEmailResult(null);
+
+		try {
+			const response = await api
+				.game({ gameId: game.id.toString() })
+				["login-emails"].post({}, { query: { authorization: user.id } });
+
+			if (response.error) {
+				const error = response.error as { value?: { message?: string } };
+				throw new Error(error.value?.message || "Failed to send login emails");
+			}
+
+			if (response.data.error) {
+				throw new Error(response.data.message);
+			}
+
+			const { sent, failed, skipped } = response.data;
+			const details = [`Sent ${sent} login email${sent === 1 ? "" : "s"}.`];
+			if (failed > 0) {
+				details.push(
+					`${failed} ${failed === 1 ? "delivery" : "deliveries"} failed.`,
+				);
+			}
+			if (skipped > 0) {
+				details.push(
+					`${skipped} ${skipped === 1 ? "player was" : "players were"} skipped because they are missing a playable country or email address.`,
+				);
+			}
+
+			setEmailResult({
+				variant: failed > 0 || skipped > 0 ? "destructive" : "default",
+				message: details.join(" "),
+			});
+		} catch (error) {
+			setEmailResult({
+				variant: "destructive",
+				message:
+					error instanceof Error
+						? error.message
+						: "Failed to send login emails",
+			});
+		} finally {
+			setIsSendingEmails(false);
+		}
+	};
 
 	// Poll for game status updates while on waiting screen
 	useEffect(() => {
@@ -258,7 +312,7 @@ function GameWaiting({
 						{isAdmin && (
 							<div className="space-y-2">
 								<p>As an admin, you can start the game at any time.</p>
-								<div className="flex gap-2 justify-center ">
+								<div className="flex flex-wrap gap-2 justify-center">
 									<Button
 										data-tutorial="start-game-button"
 										onClick={() =>
@@ -271,6 +325,14 @@ function GameWaiting({
 									>
 										Start Game
 									</Button>
+									<Button
+										variant="secondary"
+										onClick={handleSendLoginEmails}
+										disabled={isSendingEmails}
+									>
+										<Mail className="mr-2 h-4 w-4" />
+										{isSendingEmails ? "Sending..." : "Send Login Emails"}
+									</Button>
 									<Link href="/admin/users">
 										<Button
 											variant="outline"
@@ -281,6 +343,16 @@ function GameWaiting({
 										</Button>
 									</Link>
 								</div>
+								{emailResult && (
+									<Alert variant={emailResult.variant} className="text-left">
+										<AlertTitle>
+											{emailResult.variant === "destructive"
+												? "Not all login emails were sent"
+												: "Login emails sent"}
+										</AlertTitle>
+										<AlertDescription>{emailResult.message}</AlertDescription>
+									</Alert>
+								)}
 								<p className="text-center text-xs text-muted-foreground">
 									Game ID: {game.id}
 								</p>

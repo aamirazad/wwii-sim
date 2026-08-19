@@ -33,11 +33,11 @@ https://github.com/user-attachments/assets/3e7cd425-46c2-463d-8545-fe9f5d63d3c3
 
 ## Development
 
-The project is built with [bun](https://bun.sh/).
+The project uses [pnpm](https://pnpm.io/) workspaces and runs on Node.js 24 or newer.
 
-To run a local environment, copy `apps/api/.env.example` to `apps/api/.env` and `apps/web/env.example` to `apps/web/.env.local`, then fill in the Mailgun SMTP values. Run database migrations with `cd apps/api && bun run db:migrate`, then return to the repository root and run `bun install && bun dev`.
+To run a local environment, copy `apps/api/.env.example` to `apps/api/.env` and `apps/web/env.example` to `apps/web/.env.local`, then fill in the Mailgun SMTP values. Install dependencies with `pnpm install`, run database migrations with `pnpm --filter api db:migrate`, and start the workspace with `pnpm dev`.
 
-Game creation sends a personal sign-in link to every player who already has a country assignment and an email address. SMTP delivery runs in the background so the lobby is available immediately. Set `APP_URL` to the deployed Vercel URL when the frontend is hosted remotely, and add the same URL to `CORS_ORIGIN` on the self-hosted API. Multiple allowed origins can be comma-separated.
+While a scheduled game is waiting to start, an admin can send login emails from the lobby. Each assigned player receives the scheduled start time, their country, and a personal dashboard login link. Set `APP_URL` to the deployed Vercel URL and `GAME_TIME_ZONE` to the game's IANA time zone (for example, `America/New_York`). Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM` for delivery. Add the frontend URL to `CORS_ORIGIN` on the self-hosted API; multiple allowed origins can be comma-separated.
 
 Be sure to populate the database with an admin user before you start. After, the admin can create more admins though the UI.
 

@@ -2,6 +2,7 @@
 
 import { CircleHelp, X } from "lucide-react";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 
 const HELP: Record<string, Array<{ title: string; body: string }>> = {
@@ -104,51 +105,55 @@ export function HelpDrawer({ page }: { page: string }) {
 			>
 				<CircleHelp /> Help
 			</Button>
-			{open && (
-				<div className="fixed inset-0 z-50" role="presentation">
-					<button
-						type="button"
-						className="absolute inset-0 bg-black/55"
-						aria-label="Close help"
-						onClick={() => setOpen(false)}
-					/>
-					<aside
-						className="absolute right-0 top-0 h-full w-[min(28rem,92vw)] overflow-y-auto border-l bg-background p-6 shadow-2xl"
-						aria-label={`${page} help`}
-					>
-						<div className="flex items-center justify-between border-b pb-4">
-							<div>
-								<h2 className="font-serif text-2xl font-semibold">
-									{page} field manual
-								</h2>
-								<p className="mt-1 text-sm text-muted-foreground">
-									Rules stay here while you play.
-								</p>
-							</div>
-							<Button
-								variant="ghost"
-								size="icon"
-								onClick={() => setOpen(false)}
-							>
-								<X />
-								<span className="sr-only">Close help</span>
-							</Button>
-						</div>
-						<div className="divide-y">
-							{sections.map((section) => (
-								<section key={section.title} className="py-5">
-									<h3 className="font-serif text-lg font-semibold">
-										{section.title}
-									</h3>
-									<p className="mt-2 text-sm leading-6 text-muted-foreground">
-										{section.body}
+			{open &&
+				createPortal(
+					<div className="fixed inset-0 z-[100]" role="presentation">
+						<button
+							type="button"
+							className="absolute inset-0 bg-black/55"
+							aria-label="Close help"
+							onClick={() => setOpen(false)}
+						/>
+						<aside
+							className="absolute right-0 top-0 h-full w-[min(28rem,92vw)] overflow-y-auto border-l bg-background p-6 shadow-2xl"
+							aria-label={`${page} help`}
+							aria-modal="true"
+							role="dialog"
+						>
+							<div className="flex items-center justify-between border-b pb-4">
+								<div>
+									<h2 className="font-serif text-2xl font-semibold">
+										{page} field manual
+									</h2>
+									<p className="mt-1 text-sm text-muted-foreground">
+										Rules stay here while you play.
 									</p>
-								</section>
-							))}
-						</div>
-					</aside>
-				</div>
-			)}
+								</div>
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={() => setOpen(false)}
+								>
+									<X />
+									<span className="sr-only">Close help</span>
+								</Button>
+							</div>
+							<div className="divide-y">
+								{sections.map((section) => (
+									<section key={section.title} className="py-5">
+										<h3 className="font-serif text-lg font-semibold">
+											{section.title}
+										</h3>
+										<p className="mt-2 text-sm leading-6 text-muted-foreground">
+											{section.body}
+										</p>
+									</section>
+								))}
+							</div>
+						</aside>
+					</div>,
+					document.body,
+				)}
 		</>
 	);
 }

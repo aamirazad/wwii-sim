@@ -13,6 +13,7 @@ import Link from "next/link";
 import React, {
 	Children,
 	cloneElement,
+	type RefObject,
 	useEffect,
 	useMemo,
 	useRef,
@@ -35,6 +36,7 @@ export type DockProps = {
 	dockHeight?: number;
 	magnification?: number;
 	spring?: SpringOptions;
+	scrollContainerRef?: RefObject<HTMLElement | null>;
 };
 
 type DockItemProps = {
@@ -167,35 +169,110 @@ export default function Dock({
 	panelHeight = 64,
 	dockHeight = 256,
 	baseItemSize = 50,
+	scrollContainerRef,
 }: DockProps) {
 	const mouseX = useMotionValue(Infinity);
-	const isHovered = useMotionValue(0);
+	const [isScrollable, setIsScrollable] = useState(false);
+	const [isAtBottom, setIsAtBottom] = useState(true);
+	const [isPointerOver, setIsPointerOver] = useState(false);
+	const [isFocusWithin, setIsFocusWithin] = useState(false);
+	const [isPinnedOpen, setIsPinnedOpen] = useState(false);
 
 	const maxHeight = useMemo(
 		() => Math.max(dockHeight, magnification + magnification / 2 + 4),
 		[magnification, dockHeight],
 	);
-	const heightRow = useTransform(isHovered, [0, 1], [panelHeight, maxHeight]);
-	const height = useSpring(heightRow, spring);
+	const expandedWidth =
+		items.length * baseItemSize + Math.max(0, items.length - 1) * 12 + 24;
+	const isCollapsed =
+		isScrollable &&
+		!isAtBottom &&
+		!isPointerOver &&
+		!isFocusWithin &&
+		!isPinnedOpen;
+
+	useEffect(() => {
+		const element = scrollContainerRef?.current;
+
+		const updateScrollState = () => {
+			const scrollHeight = element
+				? element.scrollHeight
+				: document.documentElement.scrollHeight;
+			const viewportHeight = element
+				? element.clientHeight
+				: window.innerHeight;
+			const scrollTop = element ? element.scrollTop : window.scrollY;
+			const canScroll = scrollHeight > viewportHeight + 1;
+			setIsScrollable(canScroll);
+			setIsAtBottom(
+				!canScroll || scrollTop + viewportHeight >= scrollHeight - 4,
+			);
+		};
+
+		const handleScroll = () => {
+			setIsPinnedOpen(false);
+			updateScrollState();
+		};
+
+		const resizeObserver = new ResizeObserver(updateScrollState);
+		if (element) {
+			resizeObserver.observe(element);
+			if (element.firstElementChild instanceof HTMLElement) {
+				resizeObserver.observe(element.firstElementChild);
+			}
+			element.addEventListener("scroll", handleScroll, { passive: true });
+		} else {
+			resizeObserver.observe(document.body);
+			window.addEventListener("scroll", handleScroll, { passive: true });
+		}
+		window.addEventListener("resize", updateScrollState);
+		updateScrollState();
+
+		return () => {
+			resizeObserver.disconnect();
+			if (element) {
+				element.removeEventListener("scroll", handleScroll);
+			} else {
+				window.removeEventListener("scroll", handleScroll);
+			}
+			window.removeEventListener("resize", updateScrollState);
+		};
+	}, [scrollContainerRef]);
 
 	return (
 		<motion.div
-			style={{ height, scrollbarWidth: "none" }}
-			className="mx-2 flex max-w-full items-center fixed bottom-0 left-1/2 -translate-x-1/2 z-10"
+			initial={false}
+			animate={{
+				height: isCollapsed ? 28 : panelHeight,
+				width: isCollapsed ? 58 : expandedWidth,
+			}}
+			transition={spring}
+			style={{ maxHeight, scrollbarWidth: "none" }}
+			className="fixed bottom-2 left-1/2 z-[60] flex max-w-[calc(100vw-1rem)] -translate-x-1/2 items-end justify-center"
+			onMouseEnter={() => setIsPointerOver(true)}
+			onMouseLeave={() => {
+				setIsPointerOver(false);
+				mouseX.set(Infinity);
+			}}
+			onFocusCapture={() => setIsFocusWithin(true)}
+			onBlurCapture={(event) => {
+				if (!event.currentTarget.contains(event.relatedTarget)) {
+					setIsFocusWithin(false);
+				}
+			}}
 		>
 			<motion.div
+				initial={false}
+				animate={{ opacity: isCollapsed ? 0 : 1, scale: isCollapsed ? 0.9 : 1 }}
+				transition={{ duration: 0.18 }}
 				onMouseMove={({ pageX }) => {
-					isHovered.set(1);
 					mouseX.set(pageX);
 				}}
-				onMouseLeave={() => {
-					isHovered.set(0);
-					mouseX.set(Infinity);
-				}}
-				className={`${className} absolute bottom-0 left-1/2 transform -translate-x-1/2 flex items-end w-fit gap-3 rounded-sm border bg-background pb-2 px-3 shadow-lg`}
+				className={`${className} absolute bottom-0 left-1/2 flex w-fit -translate-x-1/2 items-end gap-3 rounded-sm border bg-background px-3 pb-2 shadow-lg ${isCollapsed ? "pointer-events-none" : ""}`}
 				style={{ height: panelHeight }}
 				role="toolbar"
 				aria-label="Application dock"
+				inert={isCollapsed}
 			>
 				{items.map((item, index) => (
 					<DockItem
@@ -213,6 +290,27 @@ export default function Dock({
 					</DockItem>
 				))}
 			</motion.div>
+			<motion.button
+				type="button"
+				initial={false}
+				animate={{
+					opacity: isCollapsed ? 1 : 0,
+					scale: isCollapsed ? 1 : 0.85,
+				}}
+				transition={{ duration: 0.18 }}
+				onClick={() => setIsPinnedOpen(true)}
+				className={`absolute inset-0 flex items-center justify-center gap-1.5 rounded-full border bg-background/95 px-3 shadow-lg backdrop-blur-sm ${isCollapsed ? "" : "pointer-events-none"}`}
+				tabIndex={isCollapsed ? 0 : -1}
+				aria-label="Expand application dock"
+				aria-expanded={!isCollapsed}
+			>
+				{items.map((item, index) => (
+					<span
+						key={`${String(item.label)}-${index}`}
+						className="size-1.5 rounded-full bg-foreground/65"
+					/>
+				))}
+			</motion.button>
 		</motion.div>
 	);
 }

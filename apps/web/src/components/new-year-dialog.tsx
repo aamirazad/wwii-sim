@@ -85,8 +85,8 @@ export function NewYearDialog() {
 				aria-hidden="true"
 			/>
 
-			<div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-white shadow-2xl ring-1 ring-black/5 dark:border-white/10 dark:bg-zinc-950">
-				<div className="relative overflow-hidden border-b border-zinc-200/70 bg-primary-foreground px-6 py-5 text-white dark:border-white/10">
+			<div className="relative w-full max-w-xl overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-2xl ring-1 ring-foreground/5">
+				<div className="relative overflow-hidden border-b border-primary/30 bg-primary px-6 py-5 text-primary-foreground">
 					<div className="pointer-events-none absolute inset-0 opacity-30">
 						<div className="absolute -left-16 -top-16 h-56 w-56 rounded-full bg-white/30 blur-3xl" />
 						<div className="absolute -bottom-20 -right-20 h-72 w-72 rounded-full bg-white/20 blur-3xl" />
@@ -107,7 +107,7 @@ export function NewYearDialog() {
 
 					<div className="relative mt-4">
 						<div className="inline-flex items-baseline gap-2 rounded-xl bg-white/10 px-4 py-3 ring-1 ring-white/20">
-							<span className="text-sm text-white/85">Year</span>
+							<span className="text-sm text-primary-foreground/85">Year</span>
 							<span className="text-3xl font-extrabold tracking-tight">
 								{newYear}
 							</span>
@@ -129,7 +129,7 @@ export function NewYearDialog() {
 									setOpen(false);
 								}
 							}}
-							className="inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-800 shadow-sm transition hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900 disabled:opacity-50 disabled:pointer-events-none"
+							className="inline-flex items-center justify-center rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 disabled:pointer-events-none disabled:opacity-50"
 						>
 							Continue
 						</button>
@@ -137,7 +137,7 @@ export function NewYearDialog() {
 				</div>
 
 				{/* subtle animated shine */}
-				<div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-white/60 to-transparent dark:via-white/30" />
+				<div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary-foreground/60 to-transparent" />
 			</div>
 		</div>
 	);

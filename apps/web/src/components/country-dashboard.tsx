@@ -1,5 +1,6 @@
 "use client";
 
+import { PLAYABLE_COUNTRIES, type PlayableCountry } from "@api/schema";
 import {
 	BookOpen,
 	CalendarClock,
@@ -17,13 +18,15 @@ import {
 	Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useGame } from "@/app/game/GameContext";
+import DataErrorState from "@/components/data-error-state";
 import Dock from "@/components/dock";
 import ExternalLink from "@/components/external-link";
 import FullAlert from "@/components/full-alert";
 import { HelpDrawer } from "@/components/help-drawer";
+import LoadingSpinner from "@/components/loading-spinner";
 import ManageUsers from "@/components/manage-users";
 import { useTutorial } from "@/components/tutorial-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -52,6 +55,13 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import {
 	Tooltip,
 	TooltipContent,
@@ -86,9 +96,10 @@ export default function CountryDashboard({
 	const [dialogOpenNewYear, setDialogOpenNewYear] = useState(false);
 	const [dialogOpenPause, setDialogOpenPause] = useState(false);
 	const [dialogOpenEnd, setDialogOpenEnd] = useState(false);
-
 	const userId = getUserId();
 	const router = useRouter();
+	const pathname = usePathname();
+	const searchParams = useSearchParams();
 
 	const yearFromGameState =
 		gameState.status === "has-game" ? gameState.game.currentYear : null;
@@ -140,6 +151,30 @@ export default function CountryDashboard({
 	const userName =
 		userState.status === "authenticated" ? userState.user.name : null;
 
+	if (gameState.status === "loading" || userState.status === "loading") {
+		return <LoadingSpinner />;
+	}
+
+	if (gameState.status === "error" || userState.status === "error") {
+		return (
+			<DataErrorState
+				title="Unable to load the game dashboard"
+				message={
+					gameState.status === "error"
+						? gameState.message
+						: userState.status === "error"
+							? userState.message
+							: undefined
+				}
+				onRetry={refetchGame}
+			/>
+		);
+	}
+
+	if (userState.status !== "authenticated") {
+		return <LoadingSpinner />;
+	}
+
 	if (!country) {
 		return (
 			<div className="flex items-center justify-center h-64">
@@ -177,6 +212,29 @@ export default function CountryDashboard({
 		userState.status === "authenticated" && userState.user.role === "admin";
 	const isMod =
 		userState.status === "authenticated" && userState.user.country === "Mods";
+	const isModerator = isAdmin || isMod;
+	const countryParam = searchParams.get("country");
+	const selectedModCountry = PLAYABLE_COUNTRIES.includes(
+		countryParam as PlayableCountry,
+	)
+		? (countryParam as PlayableCountry)
+		: PLAYABLE_COUNTRIES[0];
+
+	const withSharedDashboardParams = (path: string) => {
+		const params = new URLSearchParams();
+		if (isDemoMode) params.set("tutorial", "1");
+		if (isModerator) params.set("country", selectedModCountry);
+		const query = params.toString();
+		return query ? `${path}?${query}` : path;
+	};
+
+	const handleCountryChange = (selectedCountry: string | null) => {
+		if (!selectedCountry) return;
+		const params = new URLSearchParams(searchParams.toString());
+		params.set("country", selectedCountry);
+		const query = params.toString();
+		router.replace(query ? `${pathname}?${query}` : pathname);
+	};
 
 	const handleStopGame = async () => {
 		if (!userId || (!isAdmin && !isMod) || gameState.status !== "has-game")
@@ -264,32 +322,31 @@ export default function CountryDashboard({
 			["next-year"].post({}, { query: { authorization: userId } });
 	};
 
-	const tutorialQuery = isDemoMode ? "?tutorial=1" : "";
 	const dockItems = [
 		{
 			icon: <ScrollText size={24} />,
 			label: "Briefing",
-			href: `/game/briefing${tutorialQuery}`,
+			href: withSharedDashboardParams("/game/briefing"),
 		},
 		{
 			icon: <CircleGauge size={24} />,
 			label: "Assets",
-			href: `/game/assets${tutorialQuery}`,
+			href: withSharedDashboardParams("/game/assets"),
 		},
 		{
 			icon: <Megaphone size={24} />,
 			label: "Message Board",
-			href: `/game/announcements${tutorialQuery}`,
+			href: withSharedDashboardParams("/game/announcements"),
 		},
 		{
 			icon: <Crosshair size={24} />,
 			label: "Operations",
-			href: `/game/operations${tutorialQuery}`,
+			href: withSharedDashboardParams("/game/operations"),
 		},
 		{
 			icon: <BookOpen size={24} />,
 			label: "Research",
-			href: `/game/research${tutorialQuery}`,
+			href: withSharedDashboardParams("/game/research"),
 		},
 	];
 
@@ -336,9 +393,9 @@ export default function CountryDashboard({
 	];
 
 	return (
-		<div data-tutorial="game-shell-nav" className="flex flex-col grow relative">
+		<div data-tutorial="game-shell-nav" className="relative flex grow flex-col">
 			{/* Top Bar */}
-			<header className="w-full px-6 pb-3 pt-4 sm:px-8 flex justify-between items-center">
+			<header className="flex w-full items-center justify-between border-b border-border/70 bg-background/75 px-6 pb-3 pt-4 shadow-sm backdrop-blur-sm sm:px-8">
 				<div className="flex items-baseline gap-4">
 					<h1 className="font-serif text-3xl font-bold tracking-tight text-foreground leading-none sm:text-4xl">
 						{country}
@@ -359,6 +416,27 @@ export default function CountryDashboard({
 							{tab}
 						</p>
 					</div>
+					{isModerator && (
+						<Select
+							value={selectedModCountry}
+							onValueChange={handleCountryChange}
+						>
+							<SelectTrigger
+								aria-label="Select country"
+								className="w-52"
+								data-tutorial="mod-country-selector"
+							>
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{PLAYABLE_COUNTRIES.map((playableCountry) => (
+									<SelectItem key={playableCountry} value={playableCountry}>
+										{playableCountry}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					)}
 				</div>
 
 				<div className="flex items-center gap-3">
@@ -509,12 +587,12 @@ export default function CountryDashboard({
 					</Tooltip>
 				</div>
 			</header>
-			<div className="mx-4 grow flex overflow-hidden rounded-sm border bg-background/95 shadow-lg relative sm:mx-6">
+			<div className="relative mx-4 flex grow rounded-sm border bg-background/95 shadow-lg sm:mx-6">
 				{/* Inner Content */}
-				<div className="h-full w-full overflow-auto p-5 sm:p-8">{children}</div>
+				<div className="w-full p-5 sm:p-8">{children}</div>
 			</div>
 
-			<div className="flex">
+			<footer className="flex border-t border-border/70 bg-background/75 backdrop-blur-sm">
 				<div className="ml-4 flex grow gap-1 p-4 text-muted-foreground">
 					{userName}
 				</div>
@@ -530,13 +608,13 @@ export default function CountryDashboard({
 						</p>
 					) : null}
 				</div>
-				<Dock
-					items={dockItems}
-					panelHeight={68}
-					baseItemSize={50}
-					magnification={70}
-				/>
-			</div>
+			</footer>
+			<Dock
+				items={dockItems}
+				panelHeight={68}
+				baseItemSize={50}
+				magnification={70}
+			/>
 		</div>
 	);
 }

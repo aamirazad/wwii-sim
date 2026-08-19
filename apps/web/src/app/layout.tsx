@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Libre_Baskerville, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
-import Script from "next/script";
 import { Providers } from "./providers";
 
 const sourceSans = Source_Sans_3({
@@ -32,14 +31,8 @@ export default function RootLayout({
 	return (
 		<html suppressHydrationWarning lang="en">
 			<body
-				className={`${geistMono.variable} ${sourceSans.variable} ${libreBaskerville.variable} dark antialiased flex flex-col min-h-screen`}
+				className={`${geistMono.variable} ${sourceSans.variable} ${libreBaskerville.variable} antialiased flex flex-col min-h-screen`}
 			>
-				<Script
-					src="https://analytics.aamirazad.com/api/script.js"
-					data-site-id="e7360f70ea78"
-					strategy="lazyOnload"
-					defer
-				></Script>
 				<Providers>
 					<main className="grow flex flex-col">{children}</main>
 				</Providers>

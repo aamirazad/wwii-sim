@@ -11,6 +11,7 @@ import { Globe, Megaphone, Send, Trash2, Users } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import CountryDashboard from "@/components/country-dashboard";
+import DataErrorState from "@/components/data-error-state";
 import LoadingSpinner from "@/components/loading-spinner";
 import { useTutorial } from "@/components/tutorial-provider";
 import { Badge } from "@/components/ui/badge";
@@ -101,7 +102,7 @@ function AnnouncementCard({
 				elements.push(
 					<p
 						key={key++}
-						className="mb-4 text-sm leading-relaxed text-slate-300"
+						className="mb-4 text-sm leading-relaxed text-muted-foreground"
 					>
 						{currentParagraph}
 					</p>,
@@ -207,13 +208,13 @@ function AnnouncementCard({
 
 				if (type === "bold") {
 					parts.push(
-						<strong key={key++} className="font-bold text-white">
+						<strong key={key++} className="font-bold text-foreground">
 							{match[1]}
 						</strong>,
 					);
 				} else {
 					parts.push(
-						<em key={key++} className="italic text-slate-200">
+						<em key={key++} className="italic text-foreground/85">
 							{match[1] || match[2]}
 						</em>,
 					);
@@ -235,15 +236,15 @@ function AnnouncementCard({
 			viewport={{ once: true, amount: 0.2 }}
 			transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.5) }}
 		>
-			<Card className="overflow-hidden border-primary/20 bg-black/40 backdrop-blur-md shadow-lg shadow-primary/5 hover:bg-black/80 transition-colors duration-300 pt-0">
-				<CardHeader className="pt-4 border-b border-white/5 bg-white/5 relative z-10 rounded-t-xl">
+			<Card className="overflow-hidden border-primary/20 bg-card/80 pt-0 shadow-lg shadow-primary/5 backdrop-blur-md transition-colors duration-300 hover:bg-card">
+				<CardHeader className="relative z-10 rounded-t-xl border-b border-border/70 bg-muted/40 pt-4">
 					<div className="flex items-start justify-between gap-4">
 						<div className="flex items-center gap-3">
 							<div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
 								<Megaphone className="h-5 w-5 text-primary" />
 							</div>
 							<div>
-								<span className="font-bold text-base block leading-none mb-1 text-slate-100">
+								<span className="mb-1 block text-base font-bold leading-none text-foreground">
 									{announcement.createdBy}
 								</span>
 								<div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -272,7 +273,7 @@ function AnnouncementCard({
 												<Badge
 													key={country}
 													variant="secondary"
-													className="text-xs bg-white/5 hover:bg-white/10 text-slate-300 border-white/5"
+													className="border-border/70 bg-muted/50 text-xs text-muted-foreground hover:bg-muted"
 												>
 													{country}
 												</Badge>
@@ -285,7 +286,7 @@ function AnnouncementCard({
 									<TooltipTrigger>
 										<Badge
 											variant="outline"
-											className="bg-emerald-500/5 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10 transition-colors"
+											className="border-emerald-600/20 bg-emerald-600/5 text-emerald-700 transition-colors hover:bg-emerald-600/10 dark:border-emerald-500/20 dark:text-emerald-400"
 										>
 											<Globe className="h-3 w-3" />
 										</Badge>
@@ -309,7 +310,7 @@ function AnnouncementCard({
 					</div>
 				</CardHeader>
 				<CardContent className="relative z-10">
-					<div className="prose prose-invert prose-sm max-w-none">
+					<div className="prose prose-sm max-w-none dark:prose-invert">
 						{renderContent(announcement.content)}
 					</div>
 					<div className="mt-4 border-t pt-4 space-y-3">
@@ -419,68 +420,72 @@ function AnnouncementForm({
 			</CardHeader>
 			<CardContent>
 				<form onSubmit={handleSubmit} className="space-y-4">
-					{isMod && (
-						<div className="space-y-2">
-							<Label htmlFor="content">Message</Label>
-							<Textarea
-								id="content"
-								placeholder="Write your announcement here..."
-								value={content}
-								onChange={(e) => setContent(e.target.value)}
-								className="min-h-37.5 font-mono text-sm"
-								required
-							/>
+					<div className="space-y-2">
+						<Label htmlFor="content">Message</Label>
+						<Textarea
+							id="content"
+							placeholder="Write your announcement here..."
+							value={content}
+							onChange={(e) => setContent(e.target.value)}
+							className="min-h-37.5 font-mono text-sm"
+							required
+						/>
+						{isMod && (
 							<p className="text-xs text-muted-foreground">
 								Supports headings (#, ##, ###), **bold**, and *italic*
 								formatting
 							</p>
-						</div>
-					)}
+						)}
+					</div>
 					{!isMod && (
 						<p className="text-xs text-muted-foreground">
 							Your country may publish three global announcements each year.
 						</p>
 					)}
 
-					<div className="space-y-2">
-						<Label>Target Countries</Label>
-						<Combobox
-							multiple
-							value={targetCountries}
-							onValueChange={setTargetCountries}
-							items={PLAYABLE_COUNTRIES}
-						>
-							<ComboboxChips ref={anchor} className="w-full">
-								<ComboboxValue>
-									{(values) => (
-										<>
-											{values.map((value: string) => (
-												<ComboboxChip key={value}>{value}</ComboboxChip>
-											))}
-											<ComboboxChipsInput
-												placeholder={
-													targetCountries.length === 0 ? "Add a country..." : ""
-												}
-											/>
-										</>
-									)}
-								</ComboboxValue>
-							</ComboboxChips>
-							<ComboboxContent anchor={anchor}>
-								<ComboboxEmpty>No countries found</ComboboxEmpty>
-								<ComboboxList>
-									{(item) => (
-										<ComboboxItem key={item} value={item}>
-											{item}
-										</ComboboxItem>
-									)}
-								</ComboboxList>
-							</ComboboxContent>
-						</Combobox>
-						<p className="text-xs text-muted-foreground">
-							Leave empty to send to everyone
-						</p>
-					</div>
+					{isMod && (
+						<div className="space-y-2">
+							<Label>Target Countries</Label>
+							<Combobox
+								multiple
+								value={targetCountries}
+								onValueChange={setTargetCountries}
+								items={PLAYABLE_COUNTRIES}
+							>
+								<ComboboxChips ref={anchor} className="w-full">
+									<ComboboxValue>
+										{(values) => (
+											<>
+												{values.map((value: string) => (
+													<ComboboxChip key={value}>{value}</ComboboxChip>
+												))}
+												<ComboboxChipsInput
+													placeholder={
+														targetCountries.length === 0
+															? "Add a country..."
+															: ""
+													}
+												/>
+											</>
+										)}
+									</ComboboxValue>
+								</ComboboxChips>
+								<ComboboxContent anchor={anchor}>
+									<ComboboxEmpty>No countries found</ComboboxEmpty>
+									<ComboboxList>
+										{(item) => (
+											<ComboboxItem key={item} value={item}>
+												{item}
+											</ComboboxItem>
+										)}
+									</ComboboxList>
+								</ComboboxContent>
+							</Combobox>
+							<p className="text-xs text-muted-foreground">
+								Leave empty to send to everyone
+							</p>
+						</div>
+					)}
 
 					{error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -505,10 +510,20 @@ function LiveAnnouncementsPage() {
 
 	const userCountry =
 		userState.status === "authenticated" ? userState.user.country : null;
-	const isMod = userCountry === "Mods";
+	const isMod =
+		userCountry === "Mods" ||
+		(userState.status === "authenticated" && userState.user.role === "admin");
 
-	const { data: announcementsData, isLoading } = useQuery({
-		queryKey: ["announcements", gameState],
+	const {
+		data: announcementsData,
+		isLoading,
+		isError,
+		refetch: refetchAnnouncements,
+	} = useQuery({
+		queryKey: [
+			"announcements",
+			gameState.status === "has-game" ? gameState.game.id : null,
+		],
 		queryFn: async () => {
 			if (!userId || gameState.status !== "has-game")
 				throw new Error("Not ready");
@@ -551,6 +566,27 @@ function LiveAnnouncementsPage() {
 		userState,
 	});
 
+	if (
+		gameState.status === "loading" ||
+		userState.status === "loading" ||
+		gameState.status === "no-game"
+	) {
+		return <LoadingSpinner />;
+	}
+	if (gameState.status === "error" || userState.status === "error") {
+		return (
+			<DataErrorState
+				title="Unable to load the message board"
+				message={
+					gameState.status === "error"
+						? gameState.message
+						: userState.status === "error"
+							? userState.message
+							: undefined
+				}
+			/>
+		);
+	}
 	if (gameState.status !== "has-game") return <LoadingSpinner />;
 
 	const announcements =
@@ -681,7 +717,13 @@ function LiveAnnouncementsPage() {
 					</Card>
 				)}
 				<div className="space-y-4" data-tutorial="announcements-feed">
-					{isLoading ? (
+					{isError ? (
+						<DataErrorState
+							title="Unable to load messages"
+							message="Existing announcements could not be loaded. You can retry without leaving this page."
+							onRetry={() => refetchAnnouncements()}
+						/>
+					) : isLoading ? (
 						<p className="text-muted-foreground text-center py-8">
 							Loading announcements...
 						</p>

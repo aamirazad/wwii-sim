@@ -138,10 +138,7 @@ export const resourceChangeLogTable = t.sqliteTable("resource_change_log", {
 	// Note describing why the change was made
 	note: t.text("note").notNull(),
 	// Who made the change
-	changedBy: t
-		.text("changed_by")
-		.notNull()
-		.references(() => usersTable.id, { onDelete: "cascade" }),
+	changedBy: t.text("changed_by").notNull(),
 	createdAt: t
 		.integer("created_at", { mode: "timestamp" })
 		.default(sql`(strftime('%s','now'))`)

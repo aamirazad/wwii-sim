@@ -1,13 +1,30 @@
-# This docker file embeds a pre-built binary (usually from the github actions runner)
+FROM node:24-bookworm-slim AS build
 
-FROM gcr.io/distroless/base
-
-ARG TARGETARCH
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
 WORKDIR /app
 
-# Copy the architecture-specific server binary produced by the workflow
-COPY ./server/server-${TARGETARCH} /app/server
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json apps/api/package.json
+
+RUN pnpm install --frozen-lockfile --filter api...
+
+COPY apps/api apps/api
+
+RUN pnpm --filter api build \
+	&& pnpm --filter api deploy --prod /prod/api
+
+FROM node:24-bookworm-slim
+
+WORKDIR /app
+
+ENV NODE_ENV="production"
+ENV PATH="/app/node_modules/.bin:$PATH"
+
+COPY --from=build /prod/api ./
+
 EXPOSE 3001
 
-CMD ["/app/server"]
+CMD ["node", "dist/server.js"]
